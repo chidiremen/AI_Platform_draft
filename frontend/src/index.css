@@ -920,9 +920,6 @@ h3 {
   padding: 12px 14px;
   border-bottom: 2px solid var(--border);
   background: var(--bg-800);
-  position: sticky;
-  top: 64px;
-  z-index: 5;
   user-select: none;
 }
 .tool-table th.sortable:hover {
