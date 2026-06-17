@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useApp } from '../store'
 import { AspiceBadge, ToolTypeBadge } from '../components/Badges'
 import RequestModal from '../components/RequestModal'
@@ -63,7 +64,9 @@ export default function ToolDetailPage() {
 
           <div className="card-panel">
             <div className="markdown">
-              <ReactMarkdown>{tool.readme ?? '（READMEは未登録です）'}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {tool.readme ?? '（READMEは未登録です）'}
+              </ReactMarkdown>
             </div>
           </div>
 

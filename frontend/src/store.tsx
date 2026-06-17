@@ -56,19 +56,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const toggleLike = useCallback((toolId: string) => {
+    // 状態更新関数は純粋に保つ（StrictMode の二重呼び出しでカウントが
+    // 重複適用されるのを防ぐため、setState のネストを避ける）。
     setLikedIds((prev) => {
+      const liked = prev.has(toolId)
       const next = new Set(prev)
-      const liked = next.has(toolId)
       if (liked) next.delete(toolId)
       else next.add(toolId)
-      setTools((ts) =>
-        ts.map((t) =>
-          t.id === toolId ? { ...t, likes: t.likes + (liked ? -1 : 1) } : t,
-        ),
-      )
       return next
     })
-  }, [])
+    setTools((ts) =>
+      ts.map((t) => {
+        if (t.id !== toolId) return t
+        const delta = likedIds.has(toolId) ? -1 : 1
+        return { ...t, likes: t.likes + delta }
+      }),
+    )
+  }, [likedIds])
 
   const submitRequest = useCallback(
     (tool: Tool, reason: string) => {
