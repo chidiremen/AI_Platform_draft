@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useApp } from '../store'
-import { AspiceBadge, ToolTypeBadge } from '../components/Badges'
+import { AspiceBadge, ToolTypeBadge, WorkCategoryBadge } from '../components/Badges'
 import RequestModal from '../components/RequestModal'
 import { TOOL_TYPE_MAP } from '../data/toolTypes'
 
@@ -49,6 +49,9 @@ export default function ToolDetailPage() {
 
           <div className="detail-badges">
             <ToolTypeBadge type={tool.toolType} />
+            {(tool.workCategories ?? []).map((id) => (
+              <WorkCategoryBadge key={id} id={id} />
+            ))}
             {tool.aspiceProcesses.map((pid) => (
               <AspiceBadge key={pid} id={pid} title />
             ))}

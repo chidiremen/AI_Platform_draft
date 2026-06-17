@@ -20,6 +20,7 @@ import {
 import { useApp } from '../store'
 import { ASPICE_PROCESSES, CATEGORY_COLORS } from '../data/aspice'
 import { TOOL_TYPES, TOOL_TYPE_MAP } from '../data/toolTypes'
+import { WORK_CATEGORIES } from '../data/workCategories'
 
 const CHART_AXIS = '#6b7d99'
 const GRID = '#1d3556'
@@ -77,6 +78,19 @@ export default function DashboardPage() {
       })).filter((d) => d.value > 0),
     [tools],
   )
+
+  const workDist = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const t of tools) {
+      for (const c of t.workCategories ?? []) counts[c] = (counts[c] ?? 0) + 1
+    }
+    return WORK_CATEGORIES.map((c) => ({
+      id: c.id,
+      name: c.name,
+      count: counts[c.id] ?? 0,
+      color: c.color,
+    }))
+  }, [tools])
 
   const monthlyTrend = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -178,6 +192,24 @@ export default function DashboardPage() {
               ⚠️ 空白領域（ツール未登録）: {emptyProcesses.join(', ')}
             </p>
           )}
+        </div>
+
+        {/* 業務シーン分布 */}
+        <div className="dash-card col-12">
+          <h3>業務シーン別 ツール分布</h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={workDist} margin={{ top: 10, right: 10, bottom: 4, left: -20 }}>
+              <CartesianGrid stroke={GRID} vertical={false} />
+              <XAxis dataKey="name" stroke={CHART_AXIS} fontSize={11} interval={0} />
+              <YAxis stroke={CHART_AXIS} fontSize={11} allowDecimals={false} />
+              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                {workDist.map((d) => (
+                  <Cell key={d.id} fill={d.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
 
         {/* 月次推移 */}

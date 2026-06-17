@@ -694,6 +694,33 @@ h3 {
   width: 100%;
   max-width: 480px;
   box-shadow: var(--shadow);
+  position: relative;
+}
+.modal-wide {
+  max-width: 1100px;
+}
+.modal-wide .vmodel {
+  margin-bottom: 12px;
+}
+.modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-700);
+  color: var(--text-muted);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  cursor: pointer;
+  z-index: 1;
+}
+.modal-close:hover {
+  border-color: var(--accent);
+  color: var(--text);
 }
 .modal h3 {
   margin: 0 0 6px;
@@ -798,6 +825,49 @@ h3 {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* ── ホームヘッダ ── */
+.home-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 20px;
+}
+
+/* ── フィルタバー（業務シーン段組み）── */
+.filter-bar-stacked {
+  margin-bottom: 12px;
+}
+
+/* ── 選択中A-SPICE 表示行 ── */
+.active-aspice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  background: rgba(79, 157, 222, 0.06);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+}
+.chip-active-aspice {
+  background: var(--bg-700);
+  color: var(--text);
+  border-width: 1.5px;
+}
+.btn-ghost-link {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  cursor: pointer;
+  text-decoration: underline;
+  margin-left: auto;
+}
+.btn-ghost-link:hover {
+  color: var(--accent-bright);
 }
 
 /* ── 表示切替トグル ── */

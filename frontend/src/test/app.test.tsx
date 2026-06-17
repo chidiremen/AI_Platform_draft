@@ -14,27 +14,62 @@ function renderAt(path: string, strict = false) {
 }
 
 describe('ツール一覧（HomePage）', () => {
-  it('モックツールがカード表示される', () => {
+  it('デフォルトで全モックツールが一覧表（テーブル）表示される', () => {
     renderAt('/')
     expect(
       screen.getByText('A-SPICE要件トレーサビリティチェッカー'),
     ).toBeInTheDocument()
-    expect(screen.getByText('10 件のツール')).toBeInTheDocument()
+    expect(screen.getByText('13 件のツール')).toBeInTheDocument()
+    // デフォルトはテーブル表示なのでテーブルヘッダが描画される
+    expect(screen.getByText('業務シーン')).toBeInTheDocument()
+    expect(screen.getByText('A-SPICE')).toBeInTheDocument()
   })
 
-  it('V字モデルでプロセスをクリックすると関連ツールに絞り込まれる', () => {
+  it('A-SPICEはデフォルトでモーダル表示。ボタンを押すとモーダルが開き、V字モデルで絞り込みできる', () => {
     renderAt('/')
-    const svg = screen.getByRole('img', { name: 'A-SPICE V字モデル' })
-    // V字モデル内の SWE.1 ノードをクリック（SWE.1 を持つのは tool 1 のみ）
-    fireEvent.click(within(svg).getByText('SWE.1'))
+    // デフォルトではV字モデルは画面に表示されていない
+    expect(
+      screen.queryByRole('img', { name: 'A-SPICE V字モデル' }),
+    ).not.toBeInTheDocument()
 
+    // 「A-SPICEで絞り込む」ボタンを押すとモーダルが開く
+    fireEvent.click(screen.getByRole('button', { name: /A-SPICEで絞り込む/ }))
+    const svg = screen.getByRole('img', { name: 'A-SPICE V字モデル' })
+
+    // モーダル内のV字モデルで SWE.1 をクリック（SWE.1 を持つのは tool 1 のみ）
+    fireEvent.click(within(svg).getByText('SWE.1'))
+    // モーダルを閉じる
+    fireEvent.click(screen.getByRole('button', { name: 'この条件で絞り込む' }))
+
+    // 一覧が絞り込まれている
     expect(
       screen.getByText('A-SPICE要件トレーサビリティチェッカー'),
     ).toBeInTheDocument()
-    // SWE.1 を持たないツールは一覧から消える
     expect(
       screen.queryByText('テスト仕様書ドラフトジェネレータ'),
     ).not.toBeInTheDocument()
+    expect(screen.getByText('1 件のツール')).toBeInTheDocument()
+  })
+
+  it('業務シーン（メール処理）で絞り込みできる', () => {
+    renderAt('/')
+    // メール処理チップをクリック（tool 11: メール返信ドラフト）
+    fireEvent.click(screen.getByRole('button', { name: /メール処理/ }))
+    expect(
+      screen.getByText('メール返信ドラフト生成エージェント'),
+    ).toBeInTheDocument()
+    // メール処理を持たないツールは消える
+    expect(
+      screen.queryByText('A-SPICE要件トレーサビリティチェッカー'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('AI活用促進カテゴリでメタツールが見つかる', () => {
+    renderAt('/')
+    fireEvent.click(screen.getByRole('button', { name: /AI活用促進/ }))
+    expect(
+      screen.getByText('社内AIプロンプト集（部内ベストプラクティス）'),
+    ).toBeInTheDocument()
     expect(screen.getByText('1 件のツール')).toBeInTheDocument()
   })
 })
@@ -113,49 +148,29 @@ describe('マイページ', () => {
   })
 })
 
-describe('テーブル表示（ToolTable）', () => {
-  it('テーブル表示に切り替えるとテーブルが描画される', () => {
+describe('テーブル表示（ToolTable / デフォルトビュー）', () => {
+  it('デフォルトでテーブルヘッダが表示される', () => {
     renderAt('/')
-    // テーブルモードに切替
-    fireEvent.click(screen.getByTitle('テーブル表示'))
-    // テーブルヘッダが表示される
     expect(screen.getByText('ツール名')).toBeInTheDocument()
     expect(screen.getByText('♥ いいね')).toBeInTheDocument()
     expect(screen.getByText('アクション')).toBeInTheDocument()
-    // ツール名がテーブル内に表示される
-    expect(
-      screen.getByText('A-SPICE要件トレーサビリティチェッカー'),
-    ).toBeInTheDocument()
   })
 
-  it('テーブル表示でもV字モデルフィルタが機能する', () => {
+  it('カード表示に切り替えるとテーブルヘッダが消える', () => {
     renderAt('/')
-    fireEvent.click(screen.getByTitle('テーブル表示'))
-    const svg = screen.getByRole('img', { name: 'A-SPICE V字モデル' })
-    fireEvent.click(within(svg).getByText('MAN.3'))
-    // MAN.3 を持つ tool 4（議事録→アクションアイテム）と tool 6（サプライヤー）が表示
-    expect(
-      screen.getByText('議事録→アクションアイテム自動抽出'),
-    ).toBeInTheDocument()
-    expect(
-      screen.queryByText('MISRA-C準拠コードレビューアシスタント'),
-    ).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTitle('カード表示'))
+    expect(screen.queryByText('♥ いいね')).not.toBeInTheDocument()
   })
 
   it('テーブル表示のいいねボタンが動作する', () => {
     renderAt('/')
-    fireEvent.click(screen.getByTitle('テーブル表示'))
-    // 最初のいいねボタン（♡）をクリック
     const likeButtons = screen.getAllByTitle('いいね')
     fireEvent.click(likeButtons[0])
-    // いいね済みに変わる
     expect(screen.getAllByTitle('いいね解除').length).toBeGreaterThanOrEqual(1)
   })
 
   it('テーブル表示の申請ボタンでモーダルが開く', () => {
     renderAt('/')
-    fireEvent.click(screen.getByTitle('テーブル表示'))
-    // copilot_agent のツールの申請ボタンをクリック
     const requestButtons = screen.getAllByRole('button', { name: /📨 申請/ })
     fireEvent.click(requestButtons[0])
     expect(screen.getByText('申請理由（任意）')).toBeInTheDocument()
@@ -163,11 +178,10 @@ describe('テーブル表示（ToolTable）', () => {
 
   it('50音順ソートが機能する', () => {
     const { container } = renderAt('/')
-    fireEvent.click(screen.getByTitle('テーブル表示'))
-    // ソートを50音順に変更
-    const sortSelect = container.querySelector('.filter-bar select') as HTMLSelectElement
+    const sortSelect = container.querySelector(
+      '.filter-bar select',
+    ) as HTMLSelectElement
     fireEvent.change(sortSelect, { target: { value: 'name_asc' } })
-    // テーブル行を取得して先頭がア行であることを確認
     const firstToolName = container.querySelector('.table-tool-name')
     expect(firstToolName?.textContent).toBe('A-SPICE要件トレーサビリティチェッカー')
   })

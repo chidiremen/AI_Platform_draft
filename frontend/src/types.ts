@@ -30,7 +30,8 @@ export interface Tool {
   summary: string
   readme?: string
   toolType: ToolType
-  aspiceProcesses: string[] // process id の配列
+  aspiceProcesses: string[] // process id の配列（A-SPICE。空可）
+  workCategories?: string[] // 業務カテゴリ id の配列（A-SPICEと別軸の業務シーン分類）
   tags?: string[]
   accessUrl?: string
   author: string

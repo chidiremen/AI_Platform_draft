@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { SortKey, Tool } from '../types'
-import { AspiceBadge, ToolTypeBadge } from './Badges'
+import { AspiceBadge, ToolTypeBadge, WorkCategoryBadge } from './Badges'
 import { TOOL_TYPE_MAP } from '../data/toolTypes'
 import { useApp } from '../store'
 import RequestModal from './RequestModal'
@@ -13,7 +13,7 @@ interface Props {
 }
 
 interface ColumnDef {
-  key: SortKey | 'aspice' | 'type' | 'actions'
+  key: SortKey | 'aspice' | 'type' | 'work' | 'actions'
   label: string
   sortable: boolean
   width?: string
@@ -22,7 +22,8 @@ interface ColumnDef {
 const COLUMNS: ColumnDef[] = [
   { key: 'name_asc', label: 'ツール名', sortable: true },
   { key: 'type', label: '種別', sortable: false, width: '140px' },
-  { key: 'aspice', label: 'A-SPICE', sortable: false, width: '160px' },
+  { key: 'work', label: '業務シーン', sortable: false, width: '180px' },
+  { key: 'aspice', label: 'A-SPICE', sortable: false, width: '140px' },
   { key: 'likes', label: '♥ いいね', sortable: true, width: '90px' },
   { key: 'views', label: '👁 閲覧', sortable: true, width: '90px' },
   { key: 'requests', label: '📨 申請', sortable: true, width: '90px' },
@@ -77,12 +78,28 @@ export default function ToolTable({ tools, sort, onSort }: Props) {
                   <td>
                     <ToolTypeBadge type={tool.toolType} />
                   </td>
+                  {/* 業務シーン */}
+                  <td>
+                    <div className="table-badges">
+                      {(tool.workCategories ?? []).length > 0 ? (
+                        (tool.workCategories ?? []).map((id) => (
+                          <WorkCategoryBadge key={id} id={id} />
+                        ))
+                      ) : (
+                        <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>—</span>
+                      )}
+                    </div>
+                  </td>
                   {/* A-SPICE */}
                   <td>
                     <div className="table-badges">
-                      {tool.aspiceProcesses.map((id) => (
-                        <AspiceBadge key={id} id={id} />
-                      ))}
+                      {tool.aspiceProcesses.length > 0 ? (
+                        tool.aspiceProcesses.map((id) => (
+                          <AspiceBadge key={id} id={id} />
+                        ))
+                      ) : (
+                        <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>—</span>
+                      )}
                     </div>
                   </td>
                   {/* いいね */}

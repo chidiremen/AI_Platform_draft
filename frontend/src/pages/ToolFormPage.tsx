@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useApp } from '../store'
 import { TOOL_TYPES } from '../data/toolTypes'
 import { ASPICE_PROCESSES, CATEGORY_COLORS } from '../data/aspice'
+import { WORK_CATEGORIES, type WorkCategoryId } from '../data/workCategories'
 import type { ToolType } from '../types'
 
 export default function ToolFormPage() {
@@ -25,9 +26,19 @@ export default function ToolFormPage() {
   const [aspice, setAspice] = useState<Set<string>>(
     new Set(source?.aspiceProcesses ?? []),
   )
+  const [work, setWork] = useState<Set<WorkCategoryId>>(
+    new Set((source?.workCategories ?? []) as WorkCategoryId[]),
+  )
 
   function toggleAspice(id: string) {
     setAspice((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+  function toggleWork(id: WorkCategoryId) {
+    setWork((prev) => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
       return next
@@ -125,8 +136,45 @@ export default function ToolFormPage() {
 
         <div style={{ marginBottom: 18 }}>
           <label className="label">
-            A-SPICEプロセス *（複数選択可・{aspice.size} 件選択中）
+            業務シーン（複数選択可・{work.size} 件選択中）
           </label>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+            会議・メール・チャット処理等の業務シーン分類。A-SPICEに紐付かない雑務系・AI活用促進系ツールはこちらを選択してください。
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {WORK_CATEGORIES.map((c) => {
+              const active = work.has(c.id)
+              return (
+                <button
+                  type="button"
+                  key={c.id}
+                  className={`chip ${active ? 'active' : ''}`}
+                  style={
+                    active
+                      ? {
+                          background: c.color + '22',
+                          borderColor: c.color,
+                          color: c.color,
+                        }
+                      : undefined
+                  }
+                  onClick={() => toggleWork(c.id)}
+                  title={c.description}
+                >
+                  {c.icon} {c.name}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 18 }}>
+          <label className="label">
+            A-SPICEプロセス（複数選択可・{aspice.size} 件選択中）
+          </label>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+            車載開発プロセス（Automotive SPICE）に紐付くツールの場合に選択してください。
+          </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {ASPICE_PROCESSES.map((p) => {
               const active = aspice.has(p.id)
@@ -183,7 +231,12 @@ export default function ToolFormPage() {
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={aspice.size === 0}
+            disabled={aspice.size === 0 && work.size === 0}
+            title={
+              aspice.size === 0 && work.size === 0
+                ? '業務シーンまたはA-SPICEプロセスを少なくとも1つ選択してください'
+                : undefined
+            }
           >
             {source ? 'フォークを登録' : 'この内容で登録'}
           </button>

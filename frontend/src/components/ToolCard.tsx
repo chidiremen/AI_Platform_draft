@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { Tool } from '../types'
-import { AspiceBadge, ToolTypeBadge } from './Badges'
+import { AspiceBadge, ToolTypeBadge, WorkCategoryBadge } from './Badges'
 import { TOOL_TYPE_MAP } from '../data/toolTypes'
 
 export default function ToolCard({ tool }: { tool: Tool }) {
@@ -15,6 +15,9 @@ export default function ToolCard({ tool }: { tool: Tool }) {
         <ToolTypeBadge type={tool.toolType} />
         {tool.aspiceProcesses.map((id) => (
           <AspiceBadge key={id} id={id} />
+        ))}
+        {(tool.workCategories ?? []).map((id) => (
+          <WorkCategoryBadge key={id} id={id} />
         ))}
       </div>
 

@@ -118,6 +118,7 @@ cd misra-c-review-assistant
       '会議の議事録テキストからアクションアイテムと担当者を自動抽出するPythonスクリプト',
     toolType: 'zip_upload',
     aspiceProcesses: ['MAN.3'],
+    workCategories: ['meeting', 'task_mgmt'],
     tags: ['meeting', 'productivity', 'python'],
     author: '山田次郎',
     createdAt: '2026-06-01',
@@ -175,6 +176,7 @@ ECU仕様の変更要求に対し、関連するソースコード・設計書�
       'サプライヤーからの週次レポートを自動要約し、リスク項目をハイライトするNotebookLMノート',
     toolType: 'notebook_lm',
     aspiceProcesses: ['ACQ.4', 'MAN.3'],
+    workCategories: ['document', 'knowledge'],
     tags: ['supplier', 'summary', 'risk'],
     accessUrl: 'https://notebooklm.google.com/notebook/supplier-report-summary',
     author: '中村健太',
@@ -279,6 +281,96 @@ GitHub上で自動通知する構成管理Botです。
 
 > このツールは「A-SPICE要件トレーサビリティチェッカー」をフォークし、
 > システムレベル（SYS）に特化させた改善版です。
+`,
+  },
+  {
+    id: '11',
+    title: 'メール返信ドラフト生成エージェント',
+    summary:
+      '受信メールの内容に応じて返信ドラフトを自動生成するOutlook向けCopilotエージェント',
+    toolType: 'copilot_agent',
+    aspiceProcesses: [],
+    workCategories: ['mail', 'translation'],
+    tags: ['outlook', 'mail', 'productivity'],
+    accessUrl: 'https://copilotstudio.microsoft.com/agents/mail-replier',
+    author: '佐藤一郎',
+    createdAt: '2026-06-08',
+    likes: 38,
+    views: 612,
+    impressions: 2240,
+    accessRequests: 18,
+    effectQualitative: 'メール返信の初動が10分→2分に短縮',
+    effectHoursPerMonth: 22,
+    readme: `## 概要
+受信メールのスレッドを読み込み、丁寧語/カジュアル/英文のトーンを
+選んで返信ドラフトを自動生成するOutlook向けCopilotエージェントです。
+
+## 使い方
+1. Outlook で対象メールを開く
+2. Copilot を起動し \`返信ドラフトを作って\` と指示
+3. トーン（社内向け / 顧客向け / 英文）を選択
+4. 生成されたドラフトをレビューして送信
+
+## 特徴
+- 過去のやり取りを踏まえた文脈考慮
+- 日英バイリンガル対応（社内英語メール対応）
+`,
+  },
+  {
+    id: '12',
+    title: 'Teams会議リアルタイム要約Bot',
+    summary:
+      'Teams会議中の発言をリアルタイムに要約し、決定事項とTODOを抽出するBot',
+    toolType: 'other',
+    aspiceProcesses: [],
+    workCategories: ['meeting', 'chat', 'task_mgmt'],
+    tags: ['teams', 'meeting', 'realtime'],
+    accessUrl: 'https://teams.microsoft.com/apps/meeting-summarizer',
+    author: '高橋美咲',
+    createdAt: '2026-06-12',
+    likes: 52,
+    views: 780,
+    impressions: 2890,
+    accessRequests: 24,
+    effectQualitative: '会議後の議事録作成工数がほぼゼロに',
+    effectHoursPerMonth: 18,
+    readme: `## 概要
+Teams 会議中の音声をリアルタイムでテキスト化・要約し、終了時に
+議事録・決定事項・アクションアイテムを Teams チャネルに自動投稿する Bot です。
+
+## セットアップ
+管理者にアクセス権を申請後、Teams 会議の参加者として Bot を追加してください。
+`,
+  },
+  {
+    id: '13',
+    title: '社内AIプロンプト集（部内ベストプラクティス）',
+    summary:
+      '部内で実証済みのAIプロンプトを業務シーン別に検索できる、AI活用促進のためのプラットフォーム',
+    toolType: 'notebook_lm',
+    aspiceProcesses: [],
+    workCategories: ['ai_enablement', 'knowledge'],
+    tags: ['prompt', 'best-practice', 'enablement'],
+    accessUrl: 'https://notebooklm.google.com/notebook/internal-prompts',
+    author: '中村健太',
+    createdAt: '2026-06-14',
+    likes: 67,
+    views: 1024,
+    impressions: 3560,
+    accessRequests: 31,
+    effectQualitative: '「何にAIを使えばいいか分からない」層の活用着手率が向上',
+    effectHoursPerMonth: 0,
+    readme: `## 概要
+部内で実際に効果があったAIプロンプトを業務シーン（会議・メール・
+ドキュメント作成等）別に検索できるNotebookLMです。
+「AI活用そのものを促進する」メタツールという位置づけです。
+
+## 収録カテゴリ
+- 会議要約・議事録作成
+- メール返信・顧客対応
+- 設計書ドラフト作成
+- レビューコメント整理
+- 英語コミュニケーション
 `,
   },
 ]

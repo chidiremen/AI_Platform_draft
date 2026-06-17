@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import VModelSelector from '../components/VModelSelector'
+import AspiceModal from '../components/AspiceModal'
 import ToolCard from '../components/ToolCard'
 import ToolTable from '../components/ToolTable'
 import { TOOL_TYPES } from '../data/toolTypes'
+import { ASPICE_MAP, CATEGORY_COLORS } from '../data/aspice'
+import { WORK_CATEGORIES, type WorkCategoryId } from '../data/workCategories'
 import { useApp } from '../store'
 import type { SortKey, ToolType } from '../types'
 
@@ -29,8 +31,11 @@ export default function HomePage() {
   const q = (searchParams.get('q') ?? '').toLowerCase()
   const [selectedAspice, setSelectedAspice] = useState<Set<string>>(new Set())
   const [selectedTypes, setSelectedTypes] = useState<Set<ToolType>>(new Set())
+  const [selectedWork, setSelectedWork] = useState<Set<WorkCategoryId>>(new Set())
   const [sort, setSort] = useState<SortKey>('newest')
-  const [view, setView] = useState<ViewMode>('card')
+  // デフォルトは一覧表（テーブル）表示
+  const [view, setView] = useState<ViewMode>('table')
+  const [aspiceModalOpen, setAspiceModalOpen] = useState(false)
 
   function toggleAspice(id: string) {
     setSelectedAspice((prev) => {
@@ -43,6 +48,13 @@ export default function HomePage() {
     setSelectedTypes((prev) => {
       const next = new Set(prev)
       next.has(t) ? next.delete(t) : next.add(t)
+      return next
+    })
+  }
+  function toggleWork(id: WorkCategoryId) {
+    setSelectedWork((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
   }
@@ -59,6 +71,10 @@ export default function HomePage() {
       }
       if (selectedAspice.size > 0) {
         if (!t.aspiceProcesses.some((p) => selectedAspice.has(p))) return false
+      }
+      if (selectedWork.size > 0) {
+        const cats = t.workCategories ?? []
+        if (!cats.some((c) => selectedWork.has(c as WorkCategoryId))) return false
       }
       if (selectedTypes.size > 0 && !selectedTypes.has(t.toolType)) return false
       return true
@@ -82,16 +98,46 @@ export default function HomePage() {
       }
     })
     return list
-  }, [tools, q, selectedAspice, selectedTypes, sort])
+  }, [tools, q, selectedAspice, selectedWork, selectedTypes, sort])
+
+  const hasAnyFilter =
+    q.length > 0 ||
+    selectedAspice.size > 0 ||
+    selectedWork.size > 0 ||
+    selectedTypes.size > 0
 
   return (
     <div className="container section">
-      <VModelSelector
-        selected={selectedAspice}
-        onToggle={toggleAspice}
-        onClear={() => setSelectedAspice(new Set())}
-        tools={tools}
-      />
+      <div className="home-head">
+        <div>
+          <h1 className="page-title">AIツール カタログ</h1>
+          <p className="page-sub">
+            部内のAI活用ツールを一元管理。A-SPICEプロセスや業務シーンから探せます。
+          </p>
+        </div>
+      </div>
+
+      {/* ── フィルタバー（業務カテゴリ＋種別＋A-SPICEモーダル起動） ── */}
+      <div className="filter-bar filter-bar-stacked">
+        <div className="filter-group">
+          <span className="filter-group-label">業務シーンで探す</span>
+          {WORK_CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              className={`chip ${selectedWork.has(c.id) ? 'active' : ''}`}
+              style={
+                selectedWork.has(c.id)
+                  ? { background: c.color + '22', borderColor: c.color, color: c.color }
+                  : undefined
+              }
+              onClick={() => toggleWork(c.id)}
+              title={c.description}
+            >
+              {c.icon} {c.name}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="filter-bar">
         <div className="filter-group">
@@ -105,6 +151,21 @@ export default function HomePage() {
               {t.icon} {t.label}
             </button>
           ))}
+        </div>
+
+        <div className="filter-group">
+          <button
+            className={`btn ${selectedAspice.size > 0 ? 'active' : ''}`}
+            onClick={() => setAspiceModalOpen(true)}
+            title="A-SPICE V字モデルで絞り込み"
+          >
+            🅥 A-SPICEで絞り込む
+            {selectedAspice.size > 0 && (
+              <span className="badge" style={{ marginLeft: 6 }}>
+                {selectedAspice.size}
+              </span>
+            )}
+          </button>
         </div>
 
         <div className="spacer" />
@@ -125,14 +186,7 @@ export default function HomePage() {
           </select>
         </div>
 
-        <div className="view-toggle">
-          <button
-            className={`btn-icon view-btn ${view === 'card' ? 'active' : ''}`}
-            onClick={() => setView('card')}
-            title="カード表示"
-          >
-            ▦
-          </button>
+        <div className="view-toggle" role="group" aria-label="表示モード">
           <button
             className={`btn-icon view-btn ${view === 'table' ? 'active' : ''}`}
             onClick={() => setView('table')}
@@ -140,8 +194,42 @@ export default function HomePage() {
           >
             ≡
           </button>
+          <button
+            className={`btn-icon view-btn ${view === 'card' ? 'active' : ''}`}
+            onClick={() => setView('card')}
+            title="カード表示"
+          >
+            ▦
+          </button>
         </div>
       </div>
+
+      {/* ── 選択中A-SPICEプロセスを小さく表示 ── */}
+      {selectedAspice.size > 0 && (
+        <div className="active-aspice-row">
+          <span className="filter-group-label">A-SPICE選択中:</span>
+          {[...selectedAspice].map((id) => {
+            const p = ASPICE_MAP[id]
+            if (!p) return null
+            return (
+              <button
+                key={id}
+                className="chip chip-active-aspice"
+                style={{ borderColor: CATEGORY_COLORS[p.category] }}
+                onClick={() => toggleAspice(id)}
+              >
+                {id} {p.name} ✕
+              </button>
+            )
+          })}
+          <button
+            className="btn-ghost-link"
+            onClick={() => setSelectedAspice(new Set())}
+          >
+            すべてクリア
+          </button>
+        </div>
+      )}
 
       <div
         style={{
@@ -152,12 +240,13 @@ export default function HomePage() {
         }}
       >
         <span className="result-count">{filtered.length} 件のツール</span>
-        {(q || selectedAspice.size > 0 || selectedTypes.size > 0) && (
+        {hasAnyFilter && (
           <button
             className="btn btn-ghost"
             onClick={() => {
               setSelectedAspice(new Set())
               setSelectedTypes(new Set())
+              setSelectedWork(new Set())
               setSearchParams({})
             }}
           >
@@ -180,6 +269,16 @@ export default function HomePage() {
         <div className="empty">
           条件に一致するツールがありません。フィルタを変更してください。
         </div>
+      )}
+
+      {aspiceModalOpen && (
+        <AspiceModal
+          selected={selectedAspice}
+          onToggle={toggleAspice}
+          onClear={() => setSelectedAspice(new Set())}
+          onClose={() => setAspiceModalOpen(false)}
+          tools={tools}
+        />
       )}
     </div>
   )
