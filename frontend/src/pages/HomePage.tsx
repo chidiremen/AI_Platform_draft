@@ -2,16 +2,25 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import VModelSelector from '../components/VModelSelector'
 import ToolCard from '../components/ToolCard'
+import ToolTable from '../components/ToolTable'
 import { TOOL_TYPES } from '../data/toolTypes'
 import { useApp } from '../store'
 import type { SortKey, ToolType } from '../types'
 
+type ViewMode = 'card' | 'table'
+
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'newest', label: '新着順' },
+  { value: 'name_asc', label: '50音順' },
   { value: 'likes', label: 'いいね数順' },
   { value: 'requests', label: '申請数順' },
   { value: 'views', label: '閲覧数順' },
+  { value: 'downloads', label: 'DL数順' },
 ]
+
+function jaCollator() {
+  return new Intl.Collator('ja', { sensitivity: 'base' })
+}
 
 export default function HomePage() {
   const { tools } = useApp()
@@ -21,6 +30,7 @@ export default function HomePage() {
   const [selectedAspice, setSelectedAspice] = useState<Set<string>>(new Set())
   const [selectedTypes, setSelectedTypes] = useState<Set<ToolType>>(new Set())
   const [sort, setSort] = useState<SortKey>('newest')
+  const [view, setView] = useState<ViewMode>('card')
 
   function toggleAspice(id: string) {
     setSelectedAspice((prev) => {
@@ -38,31 +48,34 @@ export default function HomePage() {
   }
 
   const filtered = useMemo(() => {
+    const collator = jaCollator()
+
     let list = tools.filter((t) => {
-      // キーワード検索（タイトル・概要・README・タグ）
       if (q) {
         const hay = [t.title, t.summary, t.readme ?? '', (t.tags ?? []).join(' ')]
           .join(' ')
           .toLowerCase()
         if (!hay.includes(q)) return false
       }
-      // A-SPICE（OR条件）
       if (selectedAspice.size > 0) {
         if (!t.aspiceProcesses.some((p) => selectedAspice.has(p))) return false
       }
-      // ツール種別（OR条件）
       if (selectedTypes.size > 0 && !selectedTypes.has(t.toolType)) return false
       return true
     })
 
     list = [...list].sort((a, b) => {
       switch (sort) {
+        case 'name_asc':
+          return collator.compare(a.title, b.title)
         case 'likes':
           return b.likes - a.likes
         case 'requests':
           return (b.accessRequests ?? 0) - (a.accessRequests ?? 0)
         case 'views':
           return b.views - a.views
+        case 'downloads':
+          return (b.downloads ?? 0) - (a.downloads ?? 0)
         case 'newest':
         default:
           return b.createdAt.localeCompare(a.createdAt)
@@ -111,6 +124,23 @@ export default function HomePage() {
             ))}
           </select>
         </div>
+
+        <div className="view-toggle">
+          <button
+            className={`btn-icon view-btn ${view === 'card' ? 'active' : ''}`}
+            onClick={() => setView('card')}
+            title="カード表示"
+          >
+            ▦
+          </button>
+          <button
+            className={`btn-icon view-btn ${view === 'table' ? 'active' : ''}`}
+            onClick={() => setView('table')}
+            title="テーブル表示"
+          >
+            ≡
+          </button>
+        </div>
       </div>
 
       <div
@@ -137,11 +167,15 @@ export default function HomePage() {
       </div>
 
       {filtered.length > 0 ? (
-        <div className="tool-grid">
-          {filtered.map((t) => (
-            <ToolCard key={t.id} tool={t} />
-          ))}
-        </div>
+        view === 'card' ? (
+          <div className="tool-grid">
+            {filtered.map((t) => (
+              <ToolCard key={t.id} tool={t} />
+            ))}
+          </div>
+        ) : (
+          <ToolTable tools={filtered} sort={sort} onSort={setSort} />
+        )
       ) : (
         <div className="empty">
           条件に一致するツールがありません。フィルタを変更してください。

@@ -23,6 +23,7 @@ interface AppState {
   requests: AccessRequestRecord[]
   toggleLike: (toolId: string) => void
   submitRequest: (tool: Tool, reason: string) => void
+  recordDownload: (toolId: string) => void
   toast: (msg: string) => void
 }
 
@@ -99,9 +100,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [toast],
   )
 
+  const recordDownload = useCallback(
+    (toolId: string) => {
+      setTools((ts) =>
+        ts.map((t) =>
+          t.id === toolId
+            ? { ...t, downloads: (t.downloads ?? 0) + 1 }
+            : t,
+        ),
+      )
+      toast('📥 ダウンロードを開始しました（デモ）')
+    },
+    [toast],
+  )
+
   const value = useMemo<AppState>(
-    () => ({ tools, likedIds, requests, toggleLike, submitRequest, toast }),
-    [tools, likedIds, requests, toggleLike, submitRequest, toast],
+    () => ({ tools, likedIds, requests, toggleLike, submitRequest, recordDownload, toast }),
+    [tools, likedIds, requests, toggleLike, submitRequest, recordDownload, toast],
   )
 
   return (

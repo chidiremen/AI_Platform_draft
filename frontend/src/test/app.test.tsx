@@ -112,3 +112,63 @@ describe('マイページ', () => {
     expect(screen.getByText('承認済み')).toBeInTheDocument()
   })
 })
+
+describe('テーブル表示（ToolTable）', () => {
+  it('テーブル表示に切り替えるとテーブルが描画される', () => {
+    renderAt('/')
+    // テーブルモードに切替
+    fireEvent.click(screen.getByTitle('テーブル表示'))
+    // テーブルヘッダが表示される
+    expect(screen.getByText('ツール名')).toBeInTheDocument()
+    expect(screen.getByText('♥ いいね')).toBeInTheDocument()
+    expect(screen.getByText('アクション')).toBeInTheDocument()
+    // ツール名がテーブル内に表示される
+    expect(
+      screen.getByText('A-SPICE要件トレーサビリティチェッカー'),
+    ).toBeInTheDocument()
+  })
+
+  it('テーブル表示でもV字モデルフィルタが機能する', () => {
+    renderAt('/')
+    fireEvent.click(screen.getByTitle('テーブル表示'))
+    const svg = screen.getByRole('img', { name: 'A-SPICE V字モデル' })
+    fireEvent.click(within(svg).getByText('MAN.3'))
+    // MAN.3 を持つ tool 4（議事録→アクションアイテム）と tool 6（サプライヤー）が表示
+    expect(
+      screen.getByText('議事録→アクションアイテム自動抽出'),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText('MISRA-C準拠コードレビューアシスタント'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('テーブル表示のいいねボタンが動作する', () => {
+    renderAt('/')
+    fireEvent.click(screen.getByTitle('テーブル表示'))
+    // 最初のいいねボタン（♡）をクリック
+    const likeButtons = screen.getAllByTitle('いいね')
+    fireEvent.click(likeButtons[0])
+    // いいね済みに変わる
+    expect(screen.getAllByTitle('いいね解除').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('テーブル表示の申請ボタンでモーダルが開く', () => {
+    renderAt('/')
+    fireEvent.click(screen.getByTitle('テーブル表示'))
+    // copilot_agent のツールの申請ボタンをクリック
+    const requestButtons = screen.getAllByRole('button', { name: /📨 申請/ })
+    fireEvent.click(requestButtons[0])
+    expect(screen.getByText('申請理由（任意）')).toBeInTheDocument()
+  })
+
+  it('50音順ソートが機能する', () => {
+    const { container } = renderAt('/')
+    fireEvent.click(screen.getByTitle('テーブル表示'))
+    // ソートを50音順に変更
+    const sortSelect = container.querySelector('.filter-bar select') as HTMLSelectElement
+    fireEvent.change(sortSelect, { target: { value: 'name_asc' } })
+    // テーブル行を取得して先頭がア行であることを確認
+    const firstToolName = container.querySelector('.table-tool-name')
+    expect(firstToolName?.textContent).toBe('A-SPICE要件トレーサビリティチェッカー')
+  })
+})

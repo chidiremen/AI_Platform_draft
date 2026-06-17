@@ -10,7 +10,7 @@ import { TOOL_TYPE_MAP } from '../data/toolTypes'
 export default function ToolDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { tools, likedIds, toggleLike, submitRequest, toast } = useApp()
+  const { tools, likedIds, toggleLike, submitRequest, recordDownload } = useApp()
   const [showModal, setShowModal] = useState(false)
 
   const tool = tools.find((t) => t.id === id)
@@ -124,7 +124,7 @@ export default function ToolDetailPage() {
               {isDownload ? (
                 <button
                   className="btn btn-primary btn-lg btn-block"
-                  onClick={() => toast('📥 ダウンロードを開始しました（デモ）')}
+                  onClick={() => recordDownload(tool.id)}
                 >
                   📥 ダウンロード
                 </button>

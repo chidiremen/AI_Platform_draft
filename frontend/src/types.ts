@@ -48,4 +48,4 @@ export interface Tool {
   forks?: number
 }
 
-export type SortKey = 'newest' | 'likes' | 'requests' | 'views'
+export type SortKey = 'newest' | 'likes' | 'requests' | 'views' | 'name_asc' | 'downloads'
