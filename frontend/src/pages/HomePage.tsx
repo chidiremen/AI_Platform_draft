@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import AspiceModal from '../components/AspiceModal'
 import ToolCard from '../components/ToolCard'
-import ToolTable from '../components/ToolTable'
+import ToolTable, { TOGGLEABLE_COLUMNS, type ColumnKey } from '../components/ToolTable'
+import ColumnToggle from '../components/ColumnToggle'
 import { TOOL_TYPES } from '../data/toolTypes'
 import { ASPICE_MAP, CATEGORY_COLORS } from '../data/aspice'
 import { WORK_CATEGORIES, type WorkCategoryId } from '../data/workCategories'
@@ -36,6 +37,18 @@ export default function HomePage() {
   // デフォルトは一覧表（テーブル）表示
   const [view, setView] = useState<ViewMode>('table')
   const [aspiceModalOpen, setAspiceModalOpen] = useState(false)
+  // テーブルの列表示/非表示（初期は全表示）
+  const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(
+    () => new Set(TOGGLEABLE_COLUMNS.map((c) => c.key)),
+  )
+
+  function toggleColumn(key: string) {
+    setVisibleColumns((prev) => {
+      const next = new Set(prev)
+      next.has(key as ColumnKey) ? next.delete(key as ColumnKey) : next.add(key as ColumnKey)
+      return next
+    })
+  }
 
   function toggleAspice(id: string) {
     setSelectedAspice((prev) => {
@@ -186,6 +199,14 @@ export default function HomePage() {
           </select>
         </div>
 
+        {view === 'table' && (
+          <ColumnToggle
+            options={TOGGLEABLE_COLUMNS.map((c) => ({ key: c.key, label: c.label }))}
+            visible={visibleColumns}
+            onChange={toggleColumn}
+          />
+        )}
+
         <div className="view-toggle" role="group" aria-label="表示モード">
           <button
             className={`btn-icon view-btn ${view === 'table' ? 'active' : ''}`}
@@ -263,7 +284,12 @@ export default function HomePage() {
             ))}
           </div>
         ) : (
-          <ToolTable tools={filtered} sort={sort} onSort={setSort} />
+          <ToolTable
+            tools={filtered}
+            sort={sort}
+            onSort={setSort}
+            visibleColumns={visibleColumns}
+          />
         )
       ) : (
         <div className="empty">

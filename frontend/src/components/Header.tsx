@@ -1,12 +1,13 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { useApp } from '../store'
 
 export default function Header() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { currentUser, logout } = useApp()
   const [q, setQ] = useState('')
 
-  // 検索バーは URL の ?q= と同期
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     setQ(params.get('q') ?? '')
@@ -19,6 +20,8 @@ export default function Header() {
     else params.delete('q')
     navigate(`/?${params.toString()}`)
   }
+
+  const isAdmin = currentUser?.role === 'admin'
 
   return (
     <header className="header">
@@ -43,12 +46,34 @@ export default function Header() {
           <Link className="btn btn-ghost" to="/admin/dashboard">
             📊 ダッシュボード
           </Link>
+          {isAdmin && (
+            <Link className="btn btn-ghost" to="/admin/users">
+              👤 ユーザー管理
+            </Link>
+          )}
           <Link className="btn btn-ghost" to="/mypage">
             マイページ
           </Link>
           <Link className="btn btn-primary" to="/tools/new">
             ＋ ツール登録
           </Link>
+
+          <div className="user-chip" title={currentUser?.email ?? ''}>
+            <span className="user-name">{currentUser?.name}</span>
+            <span className={`role-pill role-${currentUser?.role}`}>
+              {isAdmin ? '管理者' : 'メンバー'}
+            </span>
+            <button
+              className="btn-ghost-link"
+              onClick={() => {
+                logout()
+                navigate('/')
+              }}
+              style={{ marginLeft: 4 }}
+            >
+              ログアウト
+            </button>
+          </div>
         </nav>
       </div>
     </header>

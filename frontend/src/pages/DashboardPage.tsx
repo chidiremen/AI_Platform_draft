@@ -34,7 +34,14 @@ const tooltipStyle = {
 }
 
 export default function DashboardPage() {
-  const { tools } = useApp()
+  const { tools: allTools, currentUser } = useApp()
+  const isAdmin = currentUser?.role === 'admin'
+
+  // 権限によるスコープ：管理者は全ツール、メンバーは自分が登録したツールのみ
+  const tools = useMemo(
+    () => (isAdmin ? allTools : allTools.filter((t) => t.author === currentUser?.name)),
+    [allTools, isAdmin, currentUser],
+  )
 
   const totals = useMemo(() => {
     const impressions = tools.reduce((s, t) => s + t.impressions, 0)
@@ -115,8 +122,21 @@ export default function DashboardPage() {
 
   return (
     <div className="container section">
-      <h1 className="page-title">📊 管理者ダッシュボード</h1>
-      <p className="page-sub">AI活用率をファネルメトリクスとして定量把握する</p>
+      <h1 className="page-title">📊 ダッシュボード</h1>
+      <p className="page-sub">
+        {isAdmin ? (
+          <>AI活用率をファネルメトリクスとして定量把握する（組織全体ビュー）</>
+        ) : (
+          <>
+            あなたが登録したツールのメトリクスです（メンバービュー）。組織全体の指標は管理者のみ閲覧できます。
+          </>
+        )}
+      </p>
+      {!isAdmin && tools.length === 0 && (
+        <div className="empty">
+          まだツールを登録していません。ツールを登録すると、ここに利用状況が表示されます。
+        </div>
+      )}
 
       <div className="kpi-grid" style={{ marginBottom: 20 }}>
         <div className="kpi">

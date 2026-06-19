@@ -5,13 +5,16 @@ import remarkGfm from 'remark-gfm'
 import { useApp } from '../store'
 import { AspiceBadge, ToolTypeBadge, WorkCategoryBadge } from '../components/Badges'
 import RequestModal from '../components/RequestModal'
+import ConfirmModal from '../components/ConfirmModal'
 import { TOOL_TYPE_MAP } from '../data/toolTypes'
 
 export default function ToolDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { tools, likedIds, toggleLike, submitRequest, recordDownload } = useApp()
+  const { tools, likedIds, toggleLike, submitRequest, recordDownload, canEdit, deleteTool } =
+    useApp()
   const [showModal, setShowModal] = useState(false)
+  const [showDelete, setShowDelete] = useState(false)
 
   const tool = tools.find((t) => t.id === id)
   if (!tool) {
@@ -153,6 +156,24 @@ export default function ToolDetailPage() {
               >
                 🍴 フォークして改善版を登録
               </button>
+
+              {canEdit(tool) && (
+                <div className="owner-actions">
+                  <div className="owner-actions-label">登録者・管理者メニュー</div>
+                  <button
+                    className="btn btn-block"
+                    onClick={() => navigate(`/tools/${tool.id}/edit`)}
+                  >
+                    ✏️ 編集（再投稿）
+                  </button>
+                  <button
+                    className="btn btn-danger btn-block"
+                    onClick={() => setShowDelete(true)}
+                  >
+                    🗑️ 削除
+                  </button>
+                </div>
+              )}
             </div>
 
             {tool.accessUrl && (
@@ -190,6 +211,20 @@ export default function ToolDetailPage() {
           tool={tool}
           onClose={() => setShowModal(false)}
           onSubmit={(reason) => submitRequest(tool, reason)}
+        />
+      )}
+
+      {showDelete && (
+        <ConfirmModal
+          title="ツールを削除しますか？"
+          message={`「${tool.title}」を削除します。この操作は取り消せません。`}
+          confirmLabel="削除する"
+          danger
+          onClose={() => setShowDelete(false)}
+          onConfirm={async () => {
+            await deleteTool(tool.id)
+            navigate('/')
+          }}
         />
       )}
     </div>
