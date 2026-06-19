@@ -6,39 +6,110 @@ import { TOOL_TYPE_MAP } from '../data/toolTypes'
 import { useApp } from '../store'
 import RequestModal from './RequestModal'
 
+export type ColumnKey =
+  | 'type'
+  | 'work'
+  | 'aspice'
+  | 'likes'
+  | 'views'
+  | 'requests'
+  | 'downloads'
+  | 'newest'
+
 interface Props {
   tools: Tool[]
   sort: SortKey
   onSort: (key: SortKey) => void
+  /** 表示する切替可能列（ツール名・アクションは常に表示） */
+  visibleColumns: Set<ColumnKey>
 }
 
 interface ColumnDef {
-  key: SortKey | 'aspice' | 'type' | 'work' | 'actions'
+  key: ColumnKey
   label: string
-  sortable: boolean
+  sortKey?: SortKey
   width?: string
 }
 
-const COLUMNS: ColumnDef[] = [
-  { key: 'name_asc', label: 'ツール名', sortable: true },
-  { key: 'type', label: '種別', sortable: false, width: '140px' },
-  { key: 'work', label: '業務シーン', sortable: false, width: '180px' },
-  { key: 'aspice', label: 'A-SPICE', sortable: false, width: '140px' },
-  { key: 'likes', label: '♥ いいね', sortable: true, width: '90px' },
-  { key: 'views', label: '👁 閲覧', sortable: true, width: '90px' },
-  { key: 'requests', label: '📨 申請', sortable: true, width: '90px' },
-  { key: 'downloads', label: '📥 DL', sortable: true, width: '80px' },
-  { key: 'newest', label: '登録日', sortable: true, width: '110px' },
-  { key: 'actions', label: 'アクション', sortable: false, width: '220px' },
+/** 表示/非表示を切り替えられる列の定義（ツール名・アクションは除く） */
+export const TOGGLEABLE_COLUMNS: ColumnDef[] = [
+  { key: 'type', label: '種別', width: '140px' },
+  { key: 'work', label: '業務シーン', width: '180px' },
+  { key: 'aspice', label: 'A-SPICE', width: '140px' },
+  { key: 'likes', label: '♥ いいね', sortKey: 'likes', width: '90px' },
+  { key: 'views', label: '👁 閲覧', sortKey: 'views', width: '90px' },
+  { key: 'requests', label: '📨 申請', sortKey: 'requests', width: '90px' },
+  { key: 'downloads', label: '📥 DL', sortKey: 'downloads', width: '80px' },
+  { key: 'newest', label: '登録日', sortKey: 'newest', width: '110px' },
 ]
 
-export default function ToolTable({ tools, sort, onSort }: Props) {
+export default function ToolTable({ tools, sort, onSort, visibleColumns }: Props) {
   const { likedIds, toggleLike, submitRequest, recordDownload } = useApp()
   const [modalTool, setModalTool] = useState<Tool | null>(null)
 
-  function sortIndicator(col: ColumnDef) {
-    if (!col.sortable) return ''
-    return col.key === sort ? ' ▼' : ''
+  const cols = TOGGLEABLE_COLUMNS.filter((c) => visibleColumns.has(c.key))
+
+  function renderHeaderCell(col: ColumnDef) {
+    const sortable = !!col.sortKey
+    const active = col.sortKey === sort
+    return (
+      <th
+        key={col.key}
+        style={{ width: col.width, cursor: sortable ? 'pointer' : 'default' }}
+        className={sortable ? 'sortable' : ''}
+        onClick={() => sortable && onSort(col.sortKey as SortKey)}
+      >
+        {col.label}
+        {active ? ' ▼' : ''}
+      </th>
+    )
+  }
+
+  function renderBodyCell(col: ColumnDef, tool: Tool) {
+    switch (col.key) {
+      case 'type':
+        return (
+          <td key={col.key}>
+            <ToolTypeBadge type={tool.toolType} />
+          </td>
+        )
+      case 'work':
+        return (
+          <td key={col.key}>
+            <div className="table-badges">
+              {(tool.workCategories ?? []).length > 0 ? (
+                (tool.workCategories ?? []).map((id) => <WorkCategoryBadge key={id} id={id} />)
+              ) : (
+                <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>—</span>
+              )}
+            </div>
+          </td>
+        )
+      case 'aspice':
+        return (
+          <td key={col.key}>
+            <div className="table-badges">
+              {tool.aspiceProcesses.length > 0 ? (
+                tool.aspiceProcesses.map((id) => <AspiceBadge key={id} id={id} />)
+              ) : (
+                <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>—</span>
+              )}
+            </div>
+          </td>
+        )
+      case 'likes':
+        return <td key={col.key} className="num-cell">{tool.likes}</td>
+      case 'views':
+        return <td key={col.key} className="num-cell">{tool.views}</td>
+      case 'requests':
+        return <td key={col.key} className="num-cell">{tool.accessRequests ?? 0}</td>
+      case 'downloads':
+        return <td key={col.key} className="num-cell">{tool.downloads ?? '—'}</td>
+      case 'newest':
+        return <td key={col.key} className="date-cell">{tool.createdAt}</td>
+      default:
+        return null
+    }
   }
 
   return (
@@ -47,17 +118,15 @@ export default function ToolTable({ tools, sort, onSort }: Props) {
         <table className="tool-table">
           <thead>
             <tr>
-              {COLUMNS.map((col) => (
-                <th
-                  key={col.key}
-                  style={{ width: col.width, cursor: col.sortable ? 'pointer' : 'default' }}
-                  className={col.sortable ? 'sortable' : ''}
-                  onClick={() => col.sortable && onSort(col.key as SortKey)}
-                >
-                  {col.label}
-                  {sortIndicator(col)}
-                </th>
-              ))}
+              <th
+                className="sortable"
+                style={{ cursor: 'pointer' }}
+                onClick={() => onSort('name_asc')}
+              >
+                ツール名{sort === 'name_asc' ? ' ▼' : ''}
+              </th>
+              {cols.map(renderHeaderCell)}
+              <th style={{ width: '220px' }}>アクション</th>
             </tr>
           </thead>
           <tbody>
@@ -67,52 +136,15 @@ export default function ToolTable({ tools, sort, onSort }: Props) {
               const liked = likedIds.has(tool.id)
               return (
                 <tr key={tool.id}>
-                  {/* ツール名 */}
                   <td>
                     <Link to={`/tools/${tool.id}`} className="table-tool-name">
                       {tool.title}
                     </Link>
                     <div className="table-tool-summary">{tool.summary}</div>
                   </td>
-                  {/* 種別 */}
-                  <td>
-                    <ToolTypeBadge type={tool.toolType} />
-                  </td>
-                  {/* 業務シーン */}
-                  <td>
-                    <div className="table-badges">
-                      {(tool.workCategories ?? []).length > 0 ? (
-                        (tool.workCategories ?? []).map((id) => (
-                          <WorkCategoryBadge key={id} id={id} />
-                        ))
-                      ) : (
-                        <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>—</span>
-                      )}
-                    </div>
-                  </td>
-                  {/* A-SPICE */}
-                  <td>
-                    <div className="table-badges">
-                      {tool.aspiceProcesses.length > 0 ? (
-                        tool.aspiceProcesses.map((id) => (
-                          <AspiceBadge key={id} id={id} />
-                        ))
-                      ) : (
-                        <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>—</span>
-                      )}
-                    </div>
-                  </td>
-                  {/* いいね */}
-                  <td className="num-cell">{tool.likes}</td>
-                  {/* 閲覧 */}
-                  <td className="num-cell">{tool.views}</td>
-                  {/* 申請 */}
-                  <td className="num-cell">{tool.accessRequests ?? 0}</td>
-                  {/* DL */}
-                  <td className="num-cell">{tool.downloads ?? '—'}</td>
-                  {/* 登録日 */}
-                  <td className="date-cell">{tool.createdAt}</td>
-                  {/* アクション */}
+
+                  {cols.map((col) => renderBodyCell(col, tool))}
+
                   <td>
                     <div className="table-actions">
                       <button
@@ -131,10 +163,7 @@ export default function ToolTable({ tools, sort, onSort }: Props) {
                           📥 DL
                         </button>
                       ) : (
-                        <button
-                          className="btn-sm btn-primary"
-                          onClick={() => setModalTool(tool)}
-                        >
+                        <button className="btn-sm btn-primary" onClick={() => setModalTool(tool)}>
                           📨 申請
                         </button>
                       )}

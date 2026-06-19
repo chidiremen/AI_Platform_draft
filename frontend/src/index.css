@@ -1035,7 +1035,164 @@ h3 {
   background: transparent;
 }
 
+/* ── 認証 / ログイン ── */
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: radial-gradient(circle at 30% -10%, #16294a 0%, var(--bg-900) 55%);
+}
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: var(--shadow);
+}
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 26px;
+}
+.login-title {
+  font-size: 19px;
+  font-weight: 800;
+}
+.login-sub {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.login-error {
+  margin-top: 14px;
+  background: rgba(224, 85, 107, 0.14);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-size: 13px;
+}
+.login-hint {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+.login-hint code {
+  background: var(--bg-900);
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 12px;
+}
+
+/* ── ヘッダのユーザーチップ ── */
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px 5px 12px;
+  background: var(--bg-700);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  margin-left: 6px;
+}
+.user-name {
+  font-size: 13px;
+  font-weight: 700;
+}
+.role-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.role-admin {
+  background: rgba(240, 201, 135, 0.18);
+  color: var(--amber);
+}
+.role-member {
+  background: rgba(79, 157, 222, 0.16);
+  color: var(--accent-bright);
+}
+
+/* ── 列表示切替ポップオーバー ── */
+.column-toggle {
+  position: relative;
+}
+.column-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  background: var(--bg-800);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  padding: 8px;
+  min-width: 180px;
+}
+.column-popover-title {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-weight: 700;
+  padding: 4px 8px 8px;
+}
+.column-popover-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  font-size: 13.5px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.column-popover-item:hover {
+  background: var(--bg-700);
+}
+
+/* ── 危険操作ボタン ── */
+.btn-danger {
+  background: rgba(224, 85, 107, 0.14);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.btn-danger:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+/* ── 登録者・管理者メニュー（詳細ページ） ── */
+.owner-actions {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.owner-actions-label {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
+/* ── 管理者：ユーザー管理レイアウト ── */
+.admin-grid {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 22px;
+  align-items: start;
+}
+
 @media (max-width: 900px) {
+  .admin-grid { grid-template-columns: 1fr; }
   .detail-grid { grid-template-columns: 1fr; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .col-8, .col-6, .col-4 { grid-column: span 12; }

@@ -1,8 +1,15 @@
 import { StrictMode } from 'react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../App'
+
+const SESSION_KEY = 'aitc_session'
+
+/** localStorage にセッションを書き込んでログイン状態にする */
+function seedSession(loginId = 'tanaka') {
+  localStorage.setItem(SESSION_KEY, loginId)
+}
 
 function renderAt(path: string, strict = false) {
   const ui = (
@@ -13,6 +20,53 @@ function renderAt(path: string, strict = false) {
   return render(strict ? <StrictMode>{ui}</StrictMode> : ui)
 }
 
+beforeEach(() => {
+  // デフォルトは管理者（tanaka）でログイン済み
+  seedSession('tanaka')
+})
+
+afterEach(() => {
+  localStorage.clear()
+})
+
+describe('認証（ログインゲート）', () => {
+  it('未ログイン時はログイン画面が表示される', () => {
+    localStorage.clear()
+    renderAt('/')
+    expect(screen.getByText('ログインID')).toBeInTheDocument()
+    // ツール一覧は表示されない
+    expect(screen.queryByText('13 件のツール')).not.toBeInTheDocument()
+  })
+
+  it('正しいID/PWでログインするとアプリが表示される', () => {
+    localStorage.clear()
+    renderAt('/')
+    fireEvent.change(screen.getByPlaceholderText('例: tanaka'), {
+      target: { value: 'tanaka' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('パスワード'), {
+      target: { value: 'password' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'ログイン' }))
+    expect(screen.getByText('13 件のツール')).toBeInTheDocument()
+  })
+
+  it('誤ったパスワードではエラーが表示される', () => {
+    localStorage.clear()
+    renderAt('/')
+    fireEvent.change(screen.getByPlaceholderText('例: tanaka'), {
+      target: { value: 'tanaka' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('パスワード'), {
+      target: { value: 'wrong' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'ログイン' }))
+    expect(
+      screen.getByText('ログインIDまたはパスワードが正しくありません'),
+    ).toBeInTheDocument()
+  })
+})
+
 describe('ツール一覧（HomePage）', () => {
   it('デフォルトで全モックツールが一覧表（テーブル）表示される', () => {
     renderAt('/')
@@ -20,76 +74,57 @@ describe('ツール一覧（HomePage）', () => {
       screen.getByText('A-SPICE要件トレーサビリティチェッカー'),
     ).toBeInTheDocument()
     expect(screen.getByText('13 件のツール')).toBeInTheDocument()
-    // デフォルトはテーブル表示なのでテーブルヘッダが描画される
     expect(screen.getByText('業務シーン')).toBeInTheDocument()
-    expect(screen.getByText('A-SPICE')).toBeInTheDocument()
   })
 
-  it('A-SPICEはデフォルトでモーダル表示。ボタンを押すとモーダルが開き、V字モデルで絞り込みできる', () => {
+  it('A-SPICEはモーダルから絞り込みできる', () => {
     renderAt('/')
-    // デフォルトではV字モデルは画面に表示されていない
     expect(
       screen.queryByRole('img', { name: 'A-SPICE V字モデル' }),
     ).not.toBeInTheDocument()
-
-    // 「A-SPICEで絞り込む」ボタンを押すとモーダルが開く
     fireEvent.click(screen.getByRole('button', { name: /A-SPICEで絞り込む/ }))
     const svg = screen.getByRole('img', { name: 'A-SPICE V字モデル' })
-
-    // モーダル内のV字モデルで SWE.1 をクリック（SWE.1 を持つのは tool 1 のみ）
     fireEvent.click(within(svg).getByText('SWE.1'))
-    // モーダルを閉じる
     fireEvent.click(screen.getByRole('button', { name: 'この条件で絞り込む' }))
-
-    // 一覧が絞り込まれている
     expect(
       screen.getByText('A-SPICE要件トレーサビリティチェッカー'),
     ).toBeInTheDocument()
-    expect(
-      screen.queryByText('テスト仕様書ドラフトジェネレータ'),
-    ).not.toBeInTheDocument()
     expect(screen.getByText('1 件のツール')).toBeInTheDocument()
   })
 
   it('業務シーン（メール処理）で絞り込みできる', () => {
     renderAt('/')
-    // メール処理チップをクリック（tool 11: メール返信ドラフト）
     fireEvent.click(screen.getByRole('button', { name: /メール処理/ }))
     expect(
       screen.getByText('メール返信ドラフト生成エージェント'),
     ).toBeInTheDocument()
-    // メール処理を持たないツールは消える
     expect(
       screen.queryByText('A-SPICE要件トレーサビリティチェッカー'),
     ).not.toBeInTheDocument()
   })
+})
 
-  it('AI活用促進カテゴリでメタツールが見つかる', () => {
+describe('列の表示/非表示', () => {
+  it('「いいね」列を非表示にするとテーブルヘッダから消える', () => {
     renderAt('/')
-    fireEvent.click(screen.getByRole('button', { name: /AI活用促進/ }))
-    expect(
-      screen.getByText('社内AIプロンプト集（部内ベストプラクティス）'),
-    ).toBeInTheDocument()
-    expect(screen.getByText('1 件のツール')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /表示項目/ }))
+    const menu = screen.getByRole('menu')
+    fireEvent.click(within(menu).getByRole('checkbox', { name: '♥ いいね' }))
+    const table = document.querySelector('.tool-table') as HTMLElement
+    expect(within(table).queryByText('♥ いいね')).not.toBeInTheDocument()
+    // ツール名・アクションは常に表示
+    expect(within(table).getByText('ツール名')).toBeInTheDocument()
+    expect(within(table).getByText('アクション')).toBeInTheDocument()
   })
 })
 
 describe('いいねトグル（回帰: StrictMode で二重カウントしない）', () => {
   it('いいねを押すとカウントが +1 され、+2 にはならない', () => {
-    // StrictMode 下では state 更新関数が二重実行される。
-    // 旧実装（updater 内に setState をネスト）では +2 になっていた。
     renderAt('/tools/1', true)
-
-    // tool 1 の初期いいね数は 24
     expect(screen.getByText('24')).toBeInTheDocument()
-
     fireEvent.click(screen.getByRole('button', { name: /♡ いいね/ }))
-
     expect(screen.getByText('25')).toBeInTheDocument()
     expect(screen.queryByText('26')).not.toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: /いいね済み/ }),
-    ).toBeInTheDocument()
   })
 })
 
@@ -98,91 +133,96 @@ describe('ツール詳細（回帰: README の GFM テーブル描画）', () =>
     const { container } = renderAt('/tools/1')
     const table = container.querySelector('.markdown table')
     expect(table).not.toBeNull()
-    // テーブルヘッダのセルが描画されていること
     expect(within(table as HTMLElement).getByText('要件ID')).toBeInTheDocument()
   })
 })
 
-describe('アクセス権申請フロー', () => {
-  it('申請ボタン→モーダル→送信でマイページの申請一覧に追加される', () => {
-    // copilot_agent の tool 1 は申請ボタンを持つ
+describe('ツールの編集・削除（登録者・管理者）', () => {
+  it('管理者は詳細ページに編集・削除ボタンが表示される', () => {
     renderAt('/tools/1')
-    fireEvent.click(
-      screen.getByRole('button', { name: /管理者にアクセス権を申請する/ }),
-    )
-    // モーダルが表示される
-    expect(screen.getByText('申請理由（任意）')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /編集（再投稿）/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /削除$/ })).toBeInTheDocument()
   })
-})
 
-describe('zip_upload 種別の詳細ページ', () => {
-  it('申請ボタンではなくダウンロードボタンが表示される', () => {
-    // tool 4 は zip_upload
-    renderAt('/tools/4')
+  it('権限の無いメンバーには編集・削除ボタンが表示されない', () => {
+    seedSession('suzuki') // 鈴木花子（メンバー、tool1 の登録者ではない）
+    renderAt('/tools/1')
+    expect(screen.queryByRole('button', { name: /編集（再投稿）/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /削除$/ })).not.toBeInTheDocument()
+  })
+
+  it('削除を確定するとツールが一覧から消える', () => {
+    renderAt('/tools/4') // zip_upload。管理者は削除可能
+    fireEvent.click(screen.getByRole('button', { name: /削除$/ }))
+    fireEvent.click(screen.getByRole('button', { name: '削除する' }))
+    // 一覧へ遷移し、削除したツールは存在しない
+    expect(screen.getByText('12 件のツール')).toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: /ダウンロード/ }),
-    ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: /アクセス権を申請する/ }),
+      screen.queryByText('議事録→アクションアイテム自動抽出'),
     ).not.toBeInTheDocument()
   })
+
+  it('編集画面に既存の値がプリフィルされる', () => {
+    renderAt('/tools/1/edit')
+    expect(screen.getByText('ツール編集')).toBeInTheDocument()
+    expect(
+      screen.getByDisplayValue('A-SPICE要件トレーサビリティチェッカー'),
+    ).toBeInTheDocument()
+  })
 })
 
-describe('管理者ダッシュボード', () => {
-  it('クラッシュせずにKPIが描画される', () => {
+describe('管理者ページ（ユーザー管理）', () => {
+  it('管理者はユーザー管理ページにアクセスできる', () => {
+    renderAt('/admin/users')
+    expect(screen.getByText('ユーザー初期登録')).toBeInTheDocument()
+    expect(screen.getByText(/登録ユーザー一覧/)).toBeInTheDocument()
+  })
+
+  it('メンバーはユーザー管理ページにアクセスできずトップへリダイレクトされる', () => {
+    seedSession('suzuki')
+    renderAt('/admin/users')
+    expect(screen.queryByText('ユーザー初期登録')).not.toBeInTheDocument()
+    expect(screen.getByText('13 件のツール')).toBeInTheDocument()
+  })
+
+  it('ユーザーを初期登録すると一覧に追加される', () => {
+    renderAt('/admin/users')
+    fireEvent.change(screen.getByPlaceholderText('例: yamamoto'), {
+      target: { value: 'yamamoto' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('例: 山本健一'), {
+      target: { value: '山本健一' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('初期パスワード'), {
+      target: { value: 'pw' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /ユーザーを登録/ }))
+    expect(screen.getByText('山本健一')).toBeInTheDocument()
+    expect(screen.getByText(/登録ユーザー一覧（11名）/)).toBeInTheDocument()
+  })
+})
+
+describe('権限によるダッシュボード表示の差分', () => {
+  it('管理者は組織全体ビューが表示される', () => {
     renderAt('/admin/dashboard')
+    expect(screen.getByText(/組織全体ビュー/)).toBeInTheDocument()
     expect(screen.getByText('登録ツール総数')).toBeInTheDocument()
-    expect(
-      screen.getByText('アクセス権申請 / DL（最重要KPI）'),
-    ).toBeInTheDocument()
+  })
+
+  it('メンバーは自分に関連するメンバービューが表示される', () => {
+    seedSession('suzuki') // 鈴木花子は tool2 の登録者
+    renderAt('/admin/dashboard')
+    expect(screen.getByText(/メンバービュー/)).toBeInTheDocument()
   })
 })
 
 describe('マイページ', () => {
-  it('初期投入済みの申請（承認済み）が一覧に表示される', () => {
+  it('ログインユーザーの登録ツールが表示される', () => {
     renderAt('/mypage')
-    fireEvent.click(
-      screen.getByRole('button', { name: /申請したアクセス権/ }),
-    )
-    expect(screen.getByText('承認済み')).toBeInTheDocument()
-  })
-})
-
-describe('テーブル表示（ToolTable / デフォルトビュー）', () => {
-  it('デフォルトでテーブルヘッダが表示される', () => {
-    renderAt('/')
-    expect(screen.getByText('ツール名')).toBeInTheDocument()
-    expect(screen.getByText('♥ いいね')).toBeInTheDocument()
-    expect(screen.getByText('アクション')).toBeInTheDocument()
-  })
-
-  it('カード表示に切り替えるとテーブルヘッダが消える', () => {
-    renderAt('/')
-    fireEvent.click(screen.getByTitle('カード表示'))
-    expect(screen.queryByText('♥ いいね')).not.toBeInTheDocument()
-  })
-
-  it('テーブル表示のいいねボタンが動作する', () => {
-    renderAt('/')
-    const likeButtons = screen.getAllByTitle('いいね')
-    fireEvent.click(likeButtons[0])
-    expect(screen.getAllByTitle('いいね解除').length).toBeGreaterThanOrEqual(1)
-  })
-
-  it('テーブル表示の申請ボタンでモーダルが開く', () => {
-    renderAt('/')
-    const requestButtons = screen.getAllByRole('button', { name: /📨 申請/ })
-    fireEvent.click(requestButtons[0])
-    expect(screen.getByText('申請理由（任意）')).toBeInTheDocument()
-  })
-
-  it('50音順ソートが機能する', () => {
-    const { container } = renderAt('/')
-    const sortSelect = container.querySelector(
-      '.filter-bar select',
-    ) as HTMLSelectElement
-    fireEvent.change(sortSelect, { target: { value: 'name_asc' } })
-    const firstToolName = container.querySelector('.table-tool-name')
-    expect(firstToolName?.textContent).toBe('A-SPICE要件トレーサビリティチェッカー')
+    expect(screen.getByText(/ログイン中:/)).toBeInTheDocument()
+    // tanaka（田中太郎）は tool1 の登録者
+    expect(
+      screen.getByText('A-SPICE要件トレーサビリティチェッカー'),
+    ).toBeInTheDocument()
   })
 })

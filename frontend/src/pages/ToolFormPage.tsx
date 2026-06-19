@@ -1,34 +1,46 @@
 import { useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useApp } from '../store'
 import { TOOL_TYPES } from '../data/toolTypes'
 import { ASPICE_PROCESSES, CATEGORY_COLORS } from '../data/aspice'
 import { WORK_CATEGORIES, type WorkCategoryId } from '../data/workCategories'
 import type { ToolType } from '../types'
 
+type Mode = 'new' | 'fork' | 'edit'
+
 export default function ToolFormPage() {
-  const { tools, toast } = useApp()
+  const { tools, addTool, updateTool, canEdit } = useApp()
   const navigate = useNavigate()
   const [params] = useSearchParams()
+  const { id: editId } = useParams()
 
   const forkId = params.get('fork')
+  const mode: Mode = editId ? 'edit' : forkId ? 'fork' : 'new'
+
+  // 編集 or フォーク元のツール
   const source = useMemo(
-    () => (forkId ? tools.find((t) => t.id === forkId) : undefined),
-    [forkId, tools],
+    () => tools.find((t) => t.id === (editId ?? forkId ?? '')),
+    [editId, forkId, tools],
   )
 
-  const [title, setTitle] = useState(source ? `${source.title}（改善版）` : '')
+  const [title, setTitle] = useState(
+    mode === 'fork' && source ? `${source.title}（改善版）` : source?.title ?? '',
+  )
   const [summary, setSummary] = useState(source?.summary ?? '')
   const [readme, setReadme] = useState(source?.readme ?? '')
   const [toolType, setToolType] = useState<ToolType>(source?.toolType ?? 'copilot_agent')
   const [accessUrl, setAccessUrl] = useState(source?.accessUrl ?? '')
   const [tags, setTags] = useState((source?.tags ?? []).join(', '))
-  const [aspice, setAspice] = useState<Set<string>>(
-    new Set(source?.aspiceProcesses ?? []),
-  )
+  const [aspice, setAspice] = useState<Set<string>>(new Set(source?.aspiceProcesses ?? []))
   const [work, setWork] = useState<Set<WorkCategoryId>>(
     new Set((source?.workCategories ?? []) as WorkCategoryId[]),
   )
+
+  // 編集モードで対象が無い / 権限が無い場合はリダイレクト
+  if (mode === 'edit') {
+    if (!source) return <Navigate to="/" replace />
+    if (!canEdit(source)) return <Navigate to={`/tools/${source.id}`} replace />
+  }
 
   function toggleAspice(id: string) {
     setAspice((prev) => {
@@ -47,21 +59,42 @@ export default function ToolFormPage() {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault()
-    toast(
-      source
-        ? '🍴 フォークして改善版を登録しました（デモ）'
-        : '✅ ツールを登録しました（デモ）',
-    )
-    navigate('/')
+    const input = {
+      title,
+      summary,
+      readme,
+      toolType,
+      accessUrl: accessUrl || undefined,
+      tags: tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean),
+      aspiceProcesses: [...aspice],
+      workCategories: [...work],
+      forkedFrom: mode === 'fork' ? source?.id : undefined,
+    }
+
+    if (mode === 'edit' && source) {
+      updateTool(source.id, input)
+      navigate(`/tools/${source.id}`)
+    } else {
+      const newId = addTool(input)
+      navigate(`/tools/${newId}`)
+    }
   }
 
   const needsUrl = toolType !== 'zip_upload'
   const needsZip = toolType === 'zip_upload'
 
+  const pageTitle =
+    mode === 'edit' ? 'ツール編集' : mode === 'fork' ? 'フォークして改善版を登録' : 'ツール登録'
+  const submitLabel =
+    mode === 'edit' ? '変更を保存' : mode === 'fork' ? 'フォークを登録' : 'この内容で登録'
+
   return (
     <div className="container section" style={{ maxWidth: 820 }}>
-      <h1 className="page-title">{source ? 'フォークして改善版を登録' : 'ツール登録'}</h1>
-      {source && (
+      <h1 className="page-title">{pageTitle}</h1>
+      {mode === 'fork' && source && (
         <div className="fork-note">
           🍴 「{source.title}」をフォーク元として情報をコピーしました。
           フォーク元への参照は自動付与されます。
@@ -135,9 +168,7 @@ export default function ToolFormPage() {
         )}
 
         <div style={{ marginBottom: 18 }}>
-          <label className="label">
-            業務シーン（複数選択可・{work.size} 件選択中）
-          </label>
+          <label className="label">業務シーン（複数選択可・{work.size} 件選択中）</label>
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
             会議・メール・チャット処理等の業務シーン分類。A-SPICEに紐付かない雑務系・AI活用促進系ツールはこちらを選択してください。
           </div>
@@ -151,11 +182,7 @@ export default function ToolFormPage() {
                   className={`chip ${active ? 'active' : ''}`}
                   style={
                     active
-                      ? {
-                          background: c.color + '22',
-                          borderColor: c.color,
-                          color: c.color,
-                        }
+                      ? { background: c.color + '22', borderColor: c.color, color: c.color }
                       : undefined
                   }
                   onClick={() => toggleWork(c.id)}
@@ -169,9 +196,7 @@ export default function ToolFormPage() {
         </div>
 
         <div style={{ marginBottom: 18 }}>
-          <label className="label">
-            A-SPICEプロセス（複数選択可・{aspice.size} 件選択中）
-          </label>
+          <label className="label">A-SPICEプロセス（複数選択可・{aspice.size} 件選択中）</label>
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
             車載開発プロセス（Automotive SPICE）に紐付くツールの場合に選択してください。
           </div>
@@ -238,7 +263,7 @@ export default function ToolFormPage() {
                 : undefined
             }
           >
-            {source ? 'フォークを登録' : 'この内容で登録'}
+            {submitLabel}
           </button>
         </div>
       </form>

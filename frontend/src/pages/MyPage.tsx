@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CURRENT_USER, useApp } from '../store'
+import { useApp } from '../store'
 import ToolCard from '../components/ToolCard'
 
 type Tab = 'mine' | 'liked' | 'requests' | 'incoming'
@@ -12,19 +12,21 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export default function MyPage() {
-  const { tools, likedIds, requests } = useApp()
+  const { tools, likedIds, requests, currentUser } = useApp()
   const [tab, setTab] = useState<Tab>('mine')
 
-  const myTools = tools.filter((t) => t.author === CURRENT_USER)
+  const myName = currentUser?.name ?? ''
+  const myTools = tools.filter((t) => t.author === myName)
   const likedTools = tools.filter((t) => likedIds.has(t.id))
-  const myRequests = requests.filter((r) => r.requester === CURRENT_USER)
-  const incoming = requests.filter((r) => r.author === CURRENT_USER)
+  const myRequests = requests.filter((r) => r.requester === myName)
+  const incoming = requests.filter((r) => r.author === myName)
 
   return (
     <div className="container section">
       <h1 className="page-title">マイページ</h1>
       <p className="page-sub">
-        ログイン中: <strong>{CURRENT_USER}</strong>（デモユーザー）
+        ログイン中: <strong>{myName}</strong>（
+        {currentUser?.role === 'admin' ? '組織管理者' : 'メンバー'}）
       </p>
 
       <div className="tabs">
