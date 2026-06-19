@@ -7,9 +7,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
 
-  function onSubmit(e: React.FormEvent) {
+  const [submitting, setSubmitting] = useState(false)
+
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const ok = login(loginId.trim(), password)
+    setError('')
+    setSubmitting(true)
+    const ok = await login(loginId.trim(), password)
+    setSubmitting(false)
     if (!ok) {
       setError('ログインIDまたはパスワードが正しくありません')
     }
@@ -49,8 +54,13 @@ export default function LoginPage() {
 
           {error && <div className="login-error">{error}</div>}
 
-          <button type="submit" className="btn btn-primary btn-lg btn-block" style={{ marginTop: 20 }}>
-            ログイン
+          <button
+            type="submit"
+            className="btn btn-primary btn-lg btn-block"
+            style={{ marginTop: 20 }}
+            disabled={submitting}
+          >
+            {submitting ? 'ログイン中…' : 'ログイン'}
           </button>
         </form>
 

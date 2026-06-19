@@ -221,8 +221,8 @@ export default function ToolDetailPage() {
           confirmLabel="削除する"
           danger
           onClose={() => setShowDelete(false)}
-          onConfirm={() => {
-            deleteTool(tool.id)
+          onConfirm={async () => {
+            await deleteTool(tool.id)
             navigate('/')
           }}
         />

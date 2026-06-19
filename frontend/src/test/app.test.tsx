@@ -38,7 +38,7 @@ describe('認証（ログインゲート）', () => {
     expect(screen.queryByText('13 件のツール')).not.toBeInTheDocument()
   })
 
-  it('正しいID/PWでログインするとアプリが表示される', () => {
+  it('正しいID/PWでログインするとアプリが表示される', async () => {
     localStorage.clear()
     renderAt('/')
     fireEvent.change(screen.getByPlaceholderText('例: tanaka'), {
@@ -48,10 +48,10 @@ describe('認証（ログインゲート）', () => {
       target: { value: 'password' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'ログイン' }))
-    expect(screen.getByText('13 件のツール')).toBeInTheDocument()
+    expect(await screen.findByText('13 件のツール')).toBeInTheDocument()
   })
 
-  it('誤ったパスワードではエラーが表示される', () => {
+  it('誤ったパスワードではエラーが表示される', async () => {
     localStorage.clear()
     renderAt('/')
     fireEvent.change(screen.getByPlaceholderText('例: tanaka'), {
@@ -60,9 +60,9 @@ describe('認証（ログインゲート）', () => {
     fireEvent.change(screen.getByPlaceholderText('パスワード'), {
       target: { value: 'wrong' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'ログイン' }))
+    fireEvent.click(screen.getByRole('button', { name: /ログイン/ }))
     expect(
-      screen.getByText('ログインIDまたはパスワードが正しくありません'),
+      await screen.findByText('ログインIDまたはパスワードが正しくありません'),
     ).toBeInTheDocument()
   })
 })
@@ -151,12 +151,12 @@ describe('ツールの編集・削除（登録者・管理者）', () => {
     expect(screen.queryByRole('button', { name: /削除$/ })).not.toBeInTheDocument()
   })
 
-  it('削除を確定するとツールが一覧から消える', () => {
+  it('削除を確定するとツールが一覧から消える', async () => {
     renderAt('/tools/4') // zip_upload。管理者は削除可能
     fireEvent.click(screen.getByRole('button', { name: /削除$/ }))
     fireEvent.click(screen.getByRole('button', { name: '削除する' }))
     // 一覧へ遷移し、削除したツールは存在しない
-    expect(screen.getByText('12 件のツール')).toBeInTheDocument()
+    expect(await screen.findByText('12 件のツール')).toBeInTheDocument()
     expect(
       screen.queryByText('議事録→アクションアイテム自動抽出'),
     ).not.toBeInTheDocument()
@@ -185,7 +185,7 @@ describe('管理者ページ（ユーザー管理）', () => {
     expect(screen.getByText('13 件のツール')).toBeInTheDocument()
   })
 
-  it('ユーザーを初期登録すると一覧に追加される', () => {
+  it('ユーザーを初期登録すると一覧に追加される', async () => {
     renderAt('/admin/users')
     fireEvent.change(screen.getByPlaceholderText('例: yamamoto'), {
       target: { value: 'yamamoto' },
@@ -197,7 +197,7 @@ describe('管理者ページ（ユーザー管理）', () => {
       target: { value: 'pw' },
     })
     fireEvent.click(screen.getByRole('button', { name: /ユーザーを登録/ }))
-    expect(screen.getByText('山本健一')).toBeInTheDocument()
+    expect(await screen.findByText('山本健一')).toBeInTheDocument()
     expect(screen.getByText(/登録ユーザー一覧（11名）/)).toBeInTheDocument()
   })
 })

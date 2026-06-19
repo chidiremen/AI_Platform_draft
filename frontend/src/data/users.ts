@@ -8,10 +8,12 @@
 export type Role = 'admin' | 'member'
 
 export interface User {
+  /** バックエンドの数値ID（実APIモードでのユーザー更新に使用） */
+  id?: number
   /** ログインID */
   loginId: string
-  /** モック用パスワード（平文・デモ専用） */
-  password: string
+  /** モック用パスワード（平文・デモ専用。実APIモードでは未設定） */
+  password?: string
   /** 表示名（ツールの author と突き合わせる） */
   name: string
   role: Role

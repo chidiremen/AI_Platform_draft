@@ -8,9 +8,29 @@
 
 ## 現在の状態
 
-**フロントエンド（`frontend/`）はモックデータで動作するデモUIとして稼働中**。並行して
-**バックエンド（`backend/`、Django + DRF）のスキャフォールドを構築済み**です。
-フロントエンドは現時点ではモックで動き続け、バックエンド接続は今後のステップです。
+**フロントエンド（`frontend/`）はモック / 実APIの両モードに対応**。既定はモックモードで
+バックエンド無しに全機能をデモでき、環境変数で **Django + DRF バックエンド（`backend/`）への
+接続に切替可能**です。
+
+### フロント↔バックエンド接続（モード切替）
+
+フロントエンドは `frontend/src/api/` に全エンドポイント対応のAPIクライアントを持ち、
+`frontend/src/store.tsx` がモック / 実APIを切り替えます。
+
+| モード | 設定 | 動作 |
+|---|---|---|
+| モック（既定） | （無設定） | 全データはメモリ内。バックエンド不要でデモ可能 |
+| 実API | `VITE_USE_MOCK=false` | Django バックエンドに接続（認証はDRF Tokenを localStorage 保持） |
+
+```bash
+# 実APIモードで起動（バックエンドを :8000 で起動済みのこと）
+cd frontend
+cp .env.example .env.local        # VITE_USE_MOCK=false を有効化
+npm run dev
+```
+
+> 注: 一覧APIはツール単位の閲覧数/インプレッション/DL数を返さない（ActivityLog集計のため）。
+> 実APIモードの一覧ではこれらは 0 起点で表示し、集計値は `dashboard` API を利用する想定です。
 
 ### フロントエンド実装済み機能（React + TypeScript + Vite / モック）
 

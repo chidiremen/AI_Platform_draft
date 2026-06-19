@@ -10,7 +10,21 @@ import AdminUsersPage from './pages/AdminUsersPage'
 import { AppProvider, useApp } from './store'
 
 function AuthedApp() {
-  const { currentUser } = useApp()
+  const { currentUser, loading } = useApp()
+
+  // 実APIモードの初期ロード中
+  if (loading) {
+    return (
+      <div className="login-shell">
+        <div className="login-card" style={{ textAlign: 'center' }}>
+          <div className="login-title">AI Tool Catalog</div>
+          <p className="login-sub" style={{ marginTop: 12 }}>
+            読み込み中…
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   // 未ログイン時はログイン画面のみ（社内プラットフォームのため全体を認証ゲート）
   if (!currentUser) {

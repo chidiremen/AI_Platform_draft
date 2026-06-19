@@ -19,14 +19,14 @@ export default function AdminUsersPage() {
     return <Navigate to="/" replace />
   }
 
-  function onAdd(e: React.FormEvent) {
+  async function onAdd(e: React.FormEvent) {
     e.preventDefault()
     setFormError('')
     if (!loginId.trim() || !name.trim() || !password) {
       setFormError('ログインID・表示名・パスワードは必須です')
       return
     }
-    const res = addUser({
+    const res = await addUser({
       loginId: loginId.trim(),
       name: name.trim(),
       password,

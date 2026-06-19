@@ -57,7 +57,7 @@ export default function ToolFormPage() {
     })
   }
 
-  function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     const input = {
       title,
@@ -74,12 +74,16 @@ export default function ToolFormPage() {
       forkedFrom: mode === 'fork' ? source?.id : undefined,
     }
 
-    if (mode === 'edit' && source) {
-      updateTool(source.id, input)
-      navigate(`/tools/${source.id}`)
-    } else {
-      const newId = addTool(input)
-      navigate(`/tools/${newId}`)
+    try {
+      if (mode === 'edit' && source) {
+        await updateTool(source.id, input)
+        navigate(`/tools/${source.id}`)
+      } else {
+        const newId = await addTool(input)
+        navigate(`/tools/${newId}`)
+      }
+    } catch {
+      /* エラー時はトースト等で通知（API失敗）。フォームは保持。 */
     }
   }
 

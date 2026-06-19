@@ -1,8 +1,17 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 import type { ReactNode } from 'react'
 import type { Tool } from './types'
 import { MOCK_TOOLS } from './data/tools'
 import { MOCK_USERS, type Role, type User } from './data/users'
+import { USE_MOCK } from './config'
+import * as api from './api'
 
 const SESSION_KEY = 'aitc_session'
 
@@ -30,19 +39,22 @@ export interface NewToolInput {
 }
 
 interface AppState {
+  // データソース状態
+  mode: 'mock' | 'api'
+  loading: boolean
   // 認証
   currentUser: User | null
-  login: (loginId: string, password: string) => boolean
+  login: (loginId: string, password: string) => Promise<boolean>
   logout: () => void
   // ユーザー管理（管理者）
   users: User[]
-  addUser: (u: User) => { ok: boolean; error?: string }
+  addUser: (u: User) => Promise<{ ok: boolean; error?: string }>
   updateUserRole: (loginId: string, role: Role) => void
   // ツール
   tools: Tool[]
-  addTool: (input: NewToolInput) => string
-  updateTool: (id: string, input: NewToolInput) => void
-  deleteTool: (id: string) => void
+  addTool: (input: NewToolInput) => Promise<string>
+  updateTool: (id: string, input: NewToolInput) => Promise<void>
+  deleteTool: (id: string) => Promise<void>
   // アクション
   likedIds: Set<string>
   requests: AccessRequestRecord[]
@@ -70,62 +82,149 @@ function loadSession(users: User[]): User | null {
   }
 }
 
+const SEED_REQUESTS: AccessRequestRecord[] = [
+  {
+    id: 'r0',
+    toolId: '3',
+    toolTitle: 'MISRA-C準拠コードレビューアシスタント',
+    requester: '田中太郎',
+    author: '佐藤一郎',
+    reason: '担当ECUのコードレビュー自動化に利用したいため',
+    status: 'granted',
+    createdAt: '2026-06-05',
+  },
+]
+
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [users, setUsers] = useState<User[]>(MOCK_USERS)
-  const [currentUser, setCurrentUser] = useState<User | null>(() => loadSession(MOCK_USERS))
-  const [tools, setTools] = useState<Tool[]>(MOCK_TOOLS)
+  const [users, setUsers] = useState<User[]>(USE_MOCK ? MOCK_USERS : [])
+  const [currentUser, setCurrentUser] = useState<User | null>(
+    USE_MOCK ? loadSession(MOCK_USERS) : null,
+  )
+  const [tools, setTools] = useState<Tool[]>(USE_MOCK ? MOCK_TOOLS : [])
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
-  const [requests, setRequests] = useState<AccessRequestRecord[]>([
-    {
-      id: 'r0',
-      toolId: '3',
-      toolTitle: 'MISRA-C準拠コードレビューアシスタント',
-      requester: '田中太郎',
-      author: '佐藤一郎',
-      reason: '担当ECUのコードレビュー自動化に利用したいため',
-      status: 'granted',
-      createdAt: '2026-06-05',
-    },
-  ])
+  const [requests, setRequests] = useState<AccessRequestRecord[]>(
+    USE_MOCK ? SEED_REQUESTS : [],
+  )
   const [toastMsg, setToastMsg] = useState<string | null>(null)
+  const [loading, setLoading] = useState<boolean>(!USE_MOCK)
 
   const toast = useCallback((msg: string) => {
     setToastMsg(msg)
     window.setTimeout(() => setToastMsg(null), 2600)
   }, [])
 
+  // ── 実APIモード: ログインユーザーに紐づくデータをまとめて取得 ──
+  const hydrate = useCallback(async (me: User | null) => {
+    const list = await api.listTools()
+    setTools(list)
+    if (me) {
+      const [likes, reqs, incoming] = await Promise.all([
+        api.myLikes(),
+        api.myRequests(),
+        api.incomingRequests(me.name),
+      ])
+      setLikedIds(new Set(likes.map((t) => t.id)))
+      const byId = new Map<string, AccessRequestRecord>()
+      for (const r of reqs) byId.set(r.id, r)
+      for (const r of incoming) byId.set(r.id, r) // author 入りで上書き
+      setRequests([...byId.values()])
+      if (me.role === 'admin') {
+        try {
+          setUsers(await api.listUsers())
+        } catch {
+          /* 管理者でなければ無視 */
+        }
+      }
+    } else {
+      setLikedIds(new Set())
+      setRequests([])
+    }
+  }, [])
+
+  // 実APIモードの初期ロード（セッション復元＋データ取得）
+  useEffect(() => {
+    if (USE_MOCK) return
+    let active = true
+    ;(async () => {
+      try {
+        const me = await api.getMe()
+        if (!active) return
+        setCurrentUser(me)
+        await hydrate(me)
+      } catch {
+        /* 取得失敗時は未ログイン扱い */
+      } finally {
+        if (active) setLoading(false)
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [hydrate])
+
   // ── 認証 ──
   const login = useCallback(
-    (loginId: string, password: string) => {
-      const u = users.find((x) => x.loginId === loginId && x.password === password)
-      if (!u) return false
-      setCurrentUser(u)
-      try {
-        localStorage.setItem(SESSION_KEY, u.loginId)
-      } catch {
-        /* ignore */
+    async (loginId: string, password: string) => {
+      if (USE_MOCK) {
+        const u = users.find((x) => x.loginId === loginId && x.password === password)
+        if (!u) return false
+        setCurrentUser(u)
+        try {
+          localStorage.setItem(SESSION_KEY, u.loginId)
+        } catch {
+          /* ignore */
+        }
+        return true
       }
-      return true
+      try {
+        const u = await api.login(loginId, password)
+        setCurrentUser(u)
+        await hydrate(u)
+        return true
+      } catch {
+        return false
+      }
     },
-    [users],
+    [users, hydrate],
   )
 
   const logout = useCallback(() => {
     setCurrentUser(null)
-    try {
-      localStorage.removeItem(SESSION_KEY)
-    } catch {
-      /* ignore */
+    if (USE_MOCK) {
+      try {
+        localStorage.removeItem(SESSION_KEY)
+      } catch {
+        /* ignore */
+      }
+    } else {
+      setLikedIds(new Set())
+      setRequests([])
+      void api.logout()
     }
   }, [])
 
   // ── ユーザー管理 ──
   const addUser = useCallback(
-    (u: User) => {
+    async (u: User) => {
       if (users.some((x) => x.loginId === u.loginId)) {
         return { ok: false, error: 'このログインIDは既に使われています' }
       }
-      setUsers((prev) => [...prev, u])
+      if (USE_MOCK) {
+        setUsers((prev) => [...prev, u])
+      } else {
+        try {
+          const created = await api.createUser({
+            loginId: u.loginId,
+            name: u.name,
+            password: u.password ?? '',
+            role: u.role,
+            email: u.email,
+          })
+          setUsers((prev) => [...prev, created])
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : '登録に失敗しました' }
+        }
+      }
       toast(`👤 ユーザー「${u.name}」を登録しました`)
       return { ok: true }
     },
@@ -134,11 +233,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateUserRole = useCallback(
     (loginId: string, role: Role) => {
+      const target = users.find((u) => u.loginId === loginId)
       setUsers((prev) => prev.map((u) => (u.loginId === loginId ? { ...u, role } : u)))
-      // ログイン中ユーザー自身のロールが変わった場合は反映
       setCurrentUser((cu) => (cu && cu.loginId === loginId ? { ...cu, role } : cu))
+      if (!USE_MOCK && target?.id != null) {
+        void api.updateUserRole(target.id, role)
+      }
     },
-    [],
+    [users],
   )
 
   // ── 権限 ──
@@ -150,7 +252,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // ── ツール CRUD ──
   const addTool = useCallback(
-    (input: NewToolInput) => {
+    async (input: NewToolInput) => {
+      if (!USE_MOCK) {
+        const created = await api.createTool(input)
+        setTools((prev) => [created, ...prev])
+        toast('✅ ツールを登録しました')
+        return created.id
+      }
       const id = `t${Date.now()}`
       const newTool: Tool = {
         id,
@@ -179,7 +287,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   )
 
   const updateTool = useCallback(
-    (id: string, input: NewToolInput) => {
+    async (id: string, input: NewToolInput) => {
+      if (!USE_MOCK) {
+        const updated = await api.updateTool(id, input)
+        setTools((prev) => prev.map((t) => (t.id === id ? updated : t)))
+        toast('💾 ツールを更新しました')
+        return
+      }
       setTools((prev) =>
         prev.map((t) =>
           t.id === id
@@ -204,7 +318,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   )
 
   const deleteTool = useCallback(
-    (id: string) => {
+    async (id: string) => {
+      if (!USE_MOCK) {
+        await api.deleteTool(id)
+      }
       setTools((prev) => prev.filter((t) => t.id !== id))
       toast('🗑️ ツールを削除しました')
     },
@@ -214,20 +331,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ── いいね ──
   const toggleLike = useCallback(
     (toolId: string) => {
+      const wasLiked = likedIds.has(toolId)
       setLikedIds((prev) => {
-        const liked = prev.has(toolId)
         const next = new Set(prev)
-        if (liked) next.delete(toolId)
+        if (wasLiked) next.delete(toolId)
         else next.add(toolId)
         return next
       })
       setTools((ts) =>
-        ts.map((t) => {
-          if (t.id !== toolId) return t
-          const delta = likedIds.has(toolId) ? -1 : 1
-          return { ...t, likes: t.likes + delta }
-        }),
+        ts.map((t) =>
+          t.id === toolId ? { ...t, likes: t.likes + (wasLiked ? -1 : 1) } : t,
+        ),
       )
+      if (!USE_MOCK) {
+        api
+          .toggleLike(toolId)
+          .then(({ likeCount }) =>
+            setTools((ts) => ts.map((t) => (t.id === toolId ? { ...t, likes: likeCount } : t))),
+          )
+          .catch(() => {
+            /* 失敗時は楽観更新のまま */
+          })
+      }
     },
     [likedIds],
   )
@@ -250,6 +375,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           t.id === tool.id ? { ...t, accessRequests: (t.accessRequests ?? 0) + 1 } : t,
         ),
       )
+      if (!USE_MOCK) void api.requestAccess(tool.id, reason)
       toast('📬 アクセス権申請を送信しました（登録者へTeams通知）')
     },
     [currentUser, toast],
@@ -260,6 +386,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTools((ts) =>
         ts.map((t) => (t.id === toolId ? { ...t, downloads: (t.downloads ?? 0) + 1 } : t)),
       )
+      if (!USE_MOCK) void api.postActivity([{ tool: toolId, action: 'download' }])
       toast('📥 ダウンロードを開始しました（デモ）')
     },
     [toast],
@@ -267,6 +394,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AppState>(
     () => ({
+      mode: USE_MOCK ? 'mock' : 'api',
+      loading,
       currentUser,
       login,
       logout,
@@ -286,6 +415,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toast,
     }),
     [
+      loading,
       currentUser,
       login,
       logout,
