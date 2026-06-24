@@ -163,6 +163,9 @@ export default function DashboardPage() {
 
   const emptyProcesses = aspiceDist.filter((d) => d.count === 0).map((d) => d.id)
 
+  // 直近月の新規登録数（monthlyTrend 末尾）
+  const latestMonthAdded = monthlyTrend.length ? monthlyTrend[monthlyTrend.length - 1].月次 : 0
+
   return (
     <div className="container section">
       <h1 className="page-title">📊 ダッシュボード</h1>
@@ -185,7 +188,7 @@ export default function DashboardPage() {
         <div className="kpi">
           <div className="kpi-num">{tools.length}</div>
           <div className="kpi-lbl">登録ツール総数</div>
-          <div className="kpi-sub">＋3 件（今月）</div>
+          <div className="kpi-sub">＋{latestMonthAdded} 件（直近月）</div>
         </div>
         <div className="kpi">
           <div className="kpi-num">{totals.impressions.toLocaleString()}</div>

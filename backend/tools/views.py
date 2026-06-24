@@ -9,6 +9,7 @@ from rest_framework.viewsets import ModelViewSet
 from accounts.permissions import IsAuthorOrAdminOrReadOnly, is_admin
 
 from .models import AccessRequest, Like, Tool
+from .notifications import notify_access_request
 from .serializers import (
     AccessRequestSerializer,
     ToolSerializer,
@@ -157,6 +158,8 @@ class ToolViewSet(ModelViewSet):
             tool=tool,
             reason=request.data.get("reason", ""),
         )
+        # 登録者へ Teams 通知（ベストエフォート。未設定/失敗でも申請は成功扱い）
+        notify_access_request(req)
         return Response(
             AccessRequestSerializer(req).data,
             status=status.HTTP_201_CREATED,

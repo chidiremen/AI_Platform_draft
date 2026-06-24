@@ -4,12 +4,16 @@ Regression focus: creating a tool returned 403 in real-API mode. With token
 authentication (and Token listed before Session auth), a token-bearing request
 must create a tool successfully even when CSRF checks are enforced.
 """
+from unittest import mock
+
 from django.contrib.auth import get_user_model
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient, APITestCase
 
-from tools.models import Tool
+from tools.models import AccessRequest, Tool
+from tools import notifications
 
 User = get_user_model()
 
@@ -95,3 +99,66 @@ class ToolEditDeletePermissionTests(APITestCase):
         self.assertEqual(patch.status_code, status.HTTP_200_OK)
         delete = client.delete(f"/api/tools/{self.tool.id}/")
         self.assertEqual(delete.status_code, status.HTTP_204_NO_CONTENT)
+
+
+class AccessRequestNotificationTests(APITestCase):
+    def setUp(self):
+        self.author = User.objects.create_user(
+            username="author", password="pw", role="member", display_name="作者"
+        )
+        self.requester = User.objects.create_user(
+            username="req", password="pw", role="member", display_name="申請者"
+        )
+        self.tool = Tool.objects.create(
+            title="t", summary="s", readme="r", tool_type="copilot_agent", author=self.author
+        )
+
+    def _client(self, user):
+        token, _ = Token.objects.get_or_create(user=user)
+        c = APIClient()
+        c.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+        return c
+
+    @override_settings(TEAMS_WEBHOOK_URL="https://example.com/webhook")
+    def test_request_access_sends_teams_notification(self):
+        with mock.patch("tools.views.notify_access_request") as notify:
+            res = self._client(self.requester).post(
+                f"/api/tools/{self.tool.id}/request-access/",
+                {"reason": "使いたい"},
+                format="json",
+            )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(AccessRequest.objects.count(), 1)
+        notify.assert_called_once()
+
+    @override_settings(TEAMS_WEBHOOK_URL="")
+    def test_request_access_succeeds_without_webhook(self):
+        # Webhook 未設定でも申請は成功する
+        res = self._client(self.requester).post(
+            f"/api/tools/{self.tool.id}/request-access/",
+            {"reason": "x"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+    def test_notify_skipped_when_no_url(self):
+        req = AccessRequest.objects.create(
+            requester=self.requester, tool=self.tool, reason="r"
+        )
+        with override_settings(TEAMS_WEBHOOK_URL=""):
+            self.assertFalse(notifications.notify_access_request(req))
+
+    @override_settings(TEAMS_WEBHOOK_URL="https://example.com/webhook")
+    def test_notify_posts_card_when_url_set(self):
+        req = AccessRequest.objects.create(
+            requester=self.requester, tool=self.tool, reason="理由テキスト"
+        )
+        with mock.patch("urllib.request.urlopen") as urlopen:
+            ok = notifications.notify_access_request(req)
+        self.assertTrue(ok)
+        urlopen.assert_called_once()
+        # 送信ペイロードにツール名・申請者名が含まれる
+        sent = urlopen.call_args[0][0]
+        body = sent.data.decode("utf-8")
+        self.assertIn(self.tool.title, body)
+        self.assertIn("申請者", body)
