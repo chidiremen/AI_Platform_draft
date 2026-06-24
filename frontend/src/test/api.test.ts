@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { mapTool, mapUser } from '../api'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createTool, mapTool, mapUser } from '../api'
 
 describe('API マッパー（バックエンドDTO → フロント型）', () => {
   it('mapUser は username/display_name を loginId/name に変換する', () => {
@@ -83,5 +83,64 @@ describe('API マッパー（バックエンドDTO → フロント型）', () =
     expect(t.downloads).toBe(0)
     expect(t.tags).toEqual([])
     expect(t.aspiceProcesses).toEqual([])
+  })
+})
+
+describe('APIクライアントの認証ヘッダ（回帰: 403 CSRFを防ぐ）', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    localStorage.clear()
+  })
+
+  it('POST はトークンを Authorization に付与し、Cookieを送らない（credentials: omit）', async () => {
+    localStorage.setItem('aitc_token', 'tok-123')
+    const calls: { url: string; init: RequestInit }[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: RequestInit) => {
+        calls.push({ url, init })
+        return {
+          status: 201,
+          ok: true,
+          text: async () =>
+            JSON.stringify({
+              id: 'new',
+              title: 't',
+              summary: 's',
+              readme: 'r',
+              tool_type: 'copilot_agent',
+              access_url: null,
+              tags: '',
+              work_categories: [],
+              effect_qualitative: '',
+              effect_hours_per_month: null,
+              author: { id: 1, username: 'm', display_name: 'M', role: 'member', email: '' },
+              forked_from: null,
+              aspice_processes: [],
+              like_count: 0,
+              request_count: 0,
+              liked_by_me: false,
+              created_at: '2026-01-01T00:00:00Z',
+              updated_at: '2026-01-01T00:00:00Z',
+            }),
+        }
+      }),
+    )
+
+    await createTool({
+      title: 't',
+      summary: 's',
+      readme: 'r',
+      toolType: 'copilot_agent',
+      tags: [],
+      aspiceProcesses: [],
+      workCategories: [],
+    })
+
+    expect(calls).toHaveLength(1)
+    const { init } = calls[0]
+    expect(init.method).toBe('POST')
+    expect(init.credentials).toBe('omit')
+    expect((init.headers as Record<string, string>)['Authorization']).toBe('Token tok-123')
   })
 })

@@ -50,7 +50,9 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers,
-    credentials: 'include',
+    // トークン認証のみを使う。セッションCookieを送らないことで、DRFの
+    // SessionAuthentication による CSRF 検証（POST時の403）を回避する。
+    credentials: 'omit',
   })
 
   if (res.status === 204) return undefined as T

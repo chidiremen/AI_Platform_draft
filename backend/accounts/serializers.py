@@ -7,6 +7,11 @@ User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
     """Public-facing user representation."""
 
+    # Report the *effective* role: a Django superuser is always an admin,
+    # even if the stored ``role`` column still says "member" (e.g. a user
+    # created via ``createsuperuser`` before the role sync was in place).
+    role = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
@@ -19,6 +24,11 @@ class UserSerializer(serializers.ModelSerializer):
             "date_joined",
         ]
         read_only_fields = ["id", "date_joined"]
+
+    def get_role(self, obj) -> str:
+        if obj.is_superuser or obj.role == User.Role.ADMIN:
+            return User.Role.ADMIN
+        return obj.role
 
 
 class LoginSerializer(serializers.Serializer):
