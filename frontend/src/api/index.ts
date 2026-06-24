@@ -381,3 +381,15 @@ export interface DashboardSummary {
 export async function dashboardSummary(): Promise<DashboardSummary> {
   return apiFetch<DashboardSummary>('/dashboard/summary/')
 }
+
+export interface DashboardFunnelStage {
+  stage: string
+  label: string
+  count: number
+}
+export async function dashboardFunnel(): Promise<{
+  scope: 'admin' | 'member'
+  funnel: DashboardFunnelStage[]
+}> {
+  return apiFetch('/dashboard/funnel/')
+}

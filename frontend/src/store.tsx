@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import type { ReactNode } from 'react'
@@ -61,6 +62,8 @@ interface AppState {
   toggleLike: (toolId: string) => void
   submitRequest: (tool: Tool, reason: string) => void
   recordDownload: (toolId: string) => void
+  /** ファネル計測（impression/view/readme_scroll）。セッション内で重複排除。 */
+  recordActivity: (toolId: string, action: 'impression' | 'view' | 'readme_scroll') => void
   // 権限ヘルパ
   canEdit: (tool: Tool) => boolean
   toast: (msg: string) => void
@@ -107,6 +110,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   )
   const [toastMsg, setToastMsg] = useState<string | null>(null)
   const [loading, setLoading] = useState<boolean>(!USE_MOCK)
+  // ファネル計測の重複排除（action:toolId をセッション内で一度だけ計上）
+  const activitySeen = useRef<Set<string>>(new Set())
 
   const toast = useCallback((msg: string) => {
     setToastMsg(msg)
@@ -392,6 +397,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [toast],
   )
 
+  // ── ファネル計測（impression / view / readme_scroll）──
+  const recordActivity = useCallback(
+    (toolId: string, action: 'impression' | 'view' | 'readme_scroll') => {
+      const key = `${action}:${toolId}`
+      if (activitySeen.current.has(key)) return // セッション内で重複排除
+      activitySeen.current.add(key)
+      // 閲覧・インプレッションはローカルカウントも楽観更新（一覧/詳細を「ライブ」に）
+      if (action === 'view' || action === 'impression') {
+        setTools((ts) =>
+          ts.map((t) =>
+            t.id === toolId
+              ? action === 'view'
+                ? { ...t, views: t.views + 1 }
+                : { ...t, impressions: t.impressions + 1 }
+              : t,
+          ),
+        )
+      }
+      if (!USE_MOCK) void api.postActivity([{ tool: toolId, action }])
+    },
+    [],
+  )
+
   const value = useMemo<AppState>(
     () => ({
       mode: USE_MOCK ? 'mock' : 'api',
@@ -411,6 +439,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toggleLike,
       submitRequest,
       recordDownload,
+      recordActivity,
       canEdit,
       toast,
     }),
@@ -431,6 +460,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toggleLike,
       submitRequest,
       recordDownload,
+      recordActivity,
       canEdit,
       toast,
     ],

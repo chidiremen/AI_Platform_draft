@@ -104,6 +104,15 @@ describe('ツール一覧（HomePage）', () => {
   })
 })
 
+describe('ファネル計測（活動ログ）', () => {
+  it('詳細ページを開くと閲覧数が1回だけ加算される', () => {
+    // tool 1 の初期 views は 456 → 詳細表示で 457（重複排除で +1 のみ）
+    renderAt('/tools/1')
+    expect(screen.getByText('457')).toBeInTheDocument()
+    expect(screen.queryByText('456')).not.toBeInTheDocument()
+  })
+})
+
 describe('列の表示/非表示', () => {
   it('「いいね」列を非表示にするとテーブルヘッダから消える', () => {
     renderAt('/')

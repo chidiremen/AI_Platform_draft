@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -7,14 +7,29 @@ import { AspiceBadge, ToolTypeBadge, WorkCategoryBadge } from '../components/Bad
 import RequestModal from '../components/RequestModal'
 import ConfirmModal from '../components/ConfirmModal'
 import { TOOL_TYPE_MAP } from '../data/toolTypes'
+import { useReadmeScroll } from '../hooks/useActivity'
 
 export default function ToolDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { tools, likedIds, toggleLike, submitRequest, recordDownload, canEdit, deleteTool } =
-    useApp()
+  const {
+    tools,
+    likedIds,
+    toggleLike,
+    submitRequest,
+    recordDownload,
+    recordActivity,
+    canEdit,
+    deleteTool,
+  } = useApp()
   const [showModal, setShowModal] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
+
+  // 詳細ページ閲覧（view）を記録。README到達は useReadmeScroll で記録。
+  useEffect(() => {
+    if (id) recordActivity(id, 'view')
+  }, [id, recordActivity])
+  const readmeRef = useReadmeScroll<HTMLDivElement>(id ?? '')
 
   const tool = tools.find((t) => t.id === id)
   if (!tool) {
@@ -68,7 +83,7 @@ export default function ToolDetailPage() {
             </div>
           )}
 
-          <div className="card-panel">
+          <div className="card-panel" ref={readmeRef}>
             <div className="markdown">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {tool.readme ?? '（READMEは未登録です）'}
