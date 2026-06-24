@@ -47,7 +47,9 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   }
   if (token) headers['Authorization'] = `Token ${token}`
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  // path は相対（/tools/ 等）または絶対（ページネーションの next）の両方を許容。
+  const url = path.startsWith('http') ? path : `${API_BASE}${path}`
+  const res = await fetch(url, {
     ...options,
     headers,
     // トークン認証のみを使う。セッションCookieを送らないことで、DRFの
@@ -64,6 +66,29 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     throw new ApiError(res.status, detail)
   }
   return data as T
+}
+
+/**
+ * ページネーション対応の一覧取得。
+ * DRF の PageNumberPagination（{count,next,previous,results}）の next を辿り、
+ * 全ページを結合して返す。バックエンドが配列を直接返す場合もそのまま扱う。
+ */
+async function fetchAllPages<T>(firstPath: string): Promise<T[]> {
+  const out: T[] = []
+  let next: string | null = firstPath
+  // 上限ガード（無限ループ防止）
+  let guard = 0
+  while (next && guard < 1000) {
+    guard += 1
+    const data: Paginated<T> | T[] = await apiFetch<Paginated<T> | T[]>(next)
+    if (Array.isArray(data)) {
+      out.push(...data)
+      break
+    }
+    out.push(...data.results)
+    next = data.next
+  }
+  return out
 }
 
 // ── DTO 型（必要分のみ） ──
@@ -108,6 +133,8 @@ interface AccessRequestDTO {
 }
 interface Paginated<T> {
   count: number
+  next: string | null
+  previous?: string | null
   results: T[]
 }
 
@@ -164,7 +191,7 @@ function mapAccessRequest(d: AccessRequestDTO, authorName: string): AccessReques
 }
 
 function toWritePayload(input: NewToolInput) {
-  return {
+  const payload: Record<string, unknown> = {
     title: input.title,
     summary: input.summary,
     readme: input.readme,
@@ -173,8 +200,13 @@ function toWritePayload(input: NewToolInput) {
     tags: input.tags.join(', '),
     work_categories: input.workCategories,
     aspice_process_ids: input.aspiceProcesses,
-    forked_from: input.forkedFrom ?? null,
   }
+  // forked_from は「フォーク作成時」だけ送る。編集(PATCH)では送らないことで、
+  // 既存のフォーク元リンクを誤って null 上書きしないようにする。
+  if (input.forkedFrom !== undefined) {
+    payload.forked_from = input.forkedFrom
+  }
+  return payload
 }
 
 // ── 認証 ──
@@ -228,9 +260,9 @@ export async function listTools(params: ToolListParams = {}): Promise<Tool[]> {
   if (params.sort) sp.set('sort', params.sort)
   if (params.page) sp.set('page', String(params.page))
   const qs = sp.toString()
-  const data = await apiFetch<Paginated<ToolDTO> | ToolDTO[]>(`/tools/${qs ? `?${qs}` : ''}`)
-  const results = Array.isArray(data) ? data : data.results
-  return results.map(mapTool)
+  // 全ページを取得（一覧のフィルタ/ソートはフロント側で行うため全件必要）
+  const rows = await fetchAllPages<ToolDTO>(`/tools/${qs ? `?${qs}` : ''}`)
+  return rows.map(mapTool)
 }
 
 export async function getTool(id: string): Promise<Tool> {
@@ -278,30 +310,23 @@ export function downloadUrl(id: string): string {
 
 // ── /api/me/* ──
 export async function myTools(): Promise<Tool[]> {
-  const d = await apiFetch<Paginated<ToolDTO> | ToolDTO[]>('/me/tools/')
-  return (Array.isArray(d) ? d : d.results).map(mapTool)
+  return (await fetchAllPages<ToolDTO>('/me/tools/')).map(mapTool)
 }
 export async function myLikes(): Promise<Tool[]> {
-  const d = await apiFetch<Paginated<ToolDTO> | ToolDTO[]>('/me/likes/')
-  return (Array.isArray(d) ? d : d.results).map(mapTool)
+  return (await fetchAllPages<ToolDTO>('/me/likes/')).map(mapTool)
 }
 export async function myRequests(): Promise<AccessRequestRecord[]> {
-  const d = await apiFetch<Paginated<AccessRequestDTO> | AccessRequestDTO[]>('/me/requests/')
-  const rows = Array.isArray(d) ? d : d.results
+  const rows = await fetchAllPages<AccessRequestDTO>('/me/requests/')
   return rows.map((r) => mapAccessRequest(r, ''))
 }
 export async function incomingRequests(authorName: string): Promise<AccessRequestRecord[]> {
-  const d = await apiFetch<Paginated<AccessRequestDTO> | AccessRequestDTO[]>(
-    '/me/incoming-requests/',
-  )
-  const rows = Array.isArray(d) ? d : d.results
+  const rows = await fetchAllPages<AccessRequestDTO>('/me/incoming-requests/')
   return rows.map((r) => mapAccessRequest(r, authorName))
 }
 
 // ── 管理者: ユーザー管理 ──
 export async function listUsers(): Promise<User[]> {
-  const d = await apiFetch<Paginated<UserDTO> | UserDTO[]>('/admin/users/')
-  return (Array.isArray(d) ? d : d.results).map(mapUser)
+  return (await fetchAllPages<UserDTO>('/admin/users/')).map(mapUser)
 }
 export async function createUser(input: {
   loginId: string

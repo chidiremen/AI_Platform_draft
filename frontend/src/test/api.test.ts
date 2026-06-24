@@ -1,5 +1,34 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createTool, mapTool, mapUser } from '../api'
+import { createTool, listTools, mapTool, mapUser, updateTool } from '../api'
+
+/** 最小の ToolDTO を生成 */
+function toolDTO(id: string, overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    title: `tool-${id}`,
+    summary: 's',
+    readme: 'r',
+    tool_type: 'copilot_agent',
+    access_url: null,
+    tags: '',
+    work_categories: [],
+    effect_qualitative: '',
+    effect_hours_per_month: null,
+    author: { id: 1, username: 'm', display_name: 'M', role: 'member', email: '' },
+    forked_from: null,
+    aspice_processes: [],
+    like_count: 0,
+    request_count: 0,
+    liked_by_me: false,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+function jsonResponse(body: unknown, status = 200) {
+  return { status, ok: status >= 200 && status < 300, text: async () => JSON.stringify(body) }
+}
 
 describe('API マッパー（バックエンドDTO → フロント型）', () => {
   it('mapUser は username/display_name を loginId/name に変換する', () => {
@@ -142,5 +171,79 @@ describe('APIクライアントの認証ヘッダ（回帰: 403 CSRFを防ぐ）
     expect(init.method).toBe('POST')
     expect(init.credentials).toBe('omit')
     expect((init.headers as Record<string, string>)['Authorization']).toBe('Token tok-123')
+  })
+})
+
+describe('一覧のページネーション（回帰: 全件取得）', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('listTools は next を辿って全ページを結合する', async () => {
+    const page2 = 'http://localhost:8000/api/tools/?page=2'
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('page=2')) {
+        return jsonResponse({ count: 3, next: null, results: [toolDTO('3')] })
+      }
+      return jsonResponse({ count: 3, next: page2, results: [toolDTO('1'), toolDTO('2')] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const tools = await listTools()
+    expect(tools.map((t) => t.id)).toEqual(['1', '2', '3'])
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('ツール書き込みペイロード（回帰: 編集でフォーク元を消さない）', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('createTool(フォーク) は forked_from を送る', async () => {
+    let body: Record<string, unknown> = {}
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        body = JSON.parse(init.body as string)
+        return jsonResponse(toolDTO('new'), 201)
+      }),
+    )
+    await createTool({
+      title: 't',
+      summary: 's',
+      readme: 'r',
+      toolType: 'copilot_agent',
+      tags: [],
+      aspiceProcesses: [],
+      workCategories: [],
+      forkedFrom: 'src-id',
+    })
+    expect(body.forked_from).toBe('src-id')
+  })
+
+  it('updateTool(編集) は forked_from を送らない（PATCHで上書きしない）', async () => {
+    let body: Record<string, unknown> = {}
+    let method = ''
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        body = JSON.parse(init.body as string)
+        method = init.method as string
+        return jsonResponse(toolDTO('x'))
+      }),
+    )
+    await updateTool('x', {
+      title: 't',
+      summary: 's',
+      readme: 'r',
+      toolType: 'copilot_agent',
+      tags: [],
+      aspiceProcesses: [],
+      workCategories: [],
+      // forkedFrom 未指定（編集モード）
+    })
+    expect(method).toBe('PATCH')
+    expect('forked_from' in body).toBe(false)
   })
 })
