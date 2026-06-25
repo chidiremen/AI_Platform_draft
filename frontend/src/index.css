@@ -443,9 +443,15 @@ h3 {
 /* ── 詳細ページ ── */
 .detail-grid {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  /* minmax(0,1fr): 幅広いREADME（長いコード行/横長テーブル）でも左カラムが
+     コンテンツ最小幅まで膨張してサイドバーを画面外へ押し出さないようにする */
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: 28px;
   align-items: start;
+}
+/* グリッド子要素が内容で膨らまないように（min-width:auto 対策） */
+.detail-grid > * {
+  min-width: 0;
 }
 .back-link {
   display: inline-flex;
@@ -509,6 +515,10 @@ h3 {
   font-size: 14.5px;
   line-height: 1.7;
   color: var(--text);
+  /* 横長テーブル等がカラム幅を超えても内部スクロールで収める */
+  overflow-x: auto;
+  /* 長い単語/URLは折り返す */
+  overflow-wrap: anywhere;
 }
 .markdown h2 {
   font-size: 19px;
@@ -1186,9 +1196,12 @@ h3 {
 /* ── 管理者：ユーザー管理レイアウト ── */
 .admin-grid {
   display: grid;
-  grid-template-columns: 340px 1fr;
+  grid-template-columns: 340px minmax(0, 1fr);
   gap: 22px;
   align-items: start;
+}
+.admin-grid > * {
+  min-width: 0;
 }
 
 @media (max-width: 900px) {

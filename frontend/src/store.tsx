@@ -428,11 +428,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ── アクセス権申請の承認/却下 ──
   const resolveRequest = useCallback(
     async (requestId: string, status: 'granted' | 'rejected') => {
-      if (!USE_MOCK) await api.resolveAccessRequest(requestId, status)
-      setRequests((prev) =>
-        prev.map((r) => (r.id === requestId ? { ...r, status } : r)),
-      )
-      toast(status === 'granted' ? '✅ 申請を承認しました' : '🚫 申請を却下しました')
+      try {
+        if (!USE_MOCK) await api.resolveAccessRequest(requestId, status)
+        setRequests((prev) =>
+          prev.map((r) => (r.id === requestId ? { ...r, status } : r)),
+        )
+        toast(status === 'granted' ? '✅ 申請を承認しました' : '🚫 申請を却下しました')
+      } catch (e) {
+        // API失敗時に無反応（ボタンが効かないように見える）にならないよう通知する
+        toast(`⚠️ 処理に失敗しました: ${e instanceof Error ? e.message : ''}`)
+      }
     },
     [toast],
   )

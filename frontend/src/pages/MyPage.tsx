@@ -74,6 +74,7 @@ export default function MyPage() {
 
       {tab === 'requests' &&
         (myRequests.length ? (
+          <div className="table-scroll">
           <table className="data-table">
             <thead>
               <tr>
@@ -100,12 +101,14 @@ export default function MyPage() {
               ))}
             </tbody>
           </table>
+          </div>
         ) : (
           <div className="empty">アクセス権の申請はまだありません。</div>
         ))}
 
       {tab === 'incoming' &&
         (incoming.length ? (
+          <div className="table-scroll">
           <table className="data-table">
             <thead>
               <tr>
@@ -155,6 +158,7 @@ export default function MyPage() {
               ))}
             </tbody>
           </table>
+          </div>
         ) : (
           <div className="empty">自分のツールへの申請はまだありません。</div>
         ))}
