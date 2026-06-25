@@ -41,8 +41,11 @@ export class ApiError extends Error {
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken()
+  const isFormData =
+    typeof FormData !== 'undefined' && options.body instanceof FormData
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    // multipart のときは Content-Type をブラウザに任せる（boundary 付与）
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers as Record<string, string>),
   }
   if (token) headers['Authorization'] = `Token ${token}`
@@ -102,6 +105,12 @@ interface UserDTO {
 interface AspiceDTO {
   id: string
 }
+interface ScreenshotDTO {
+  id: string
+  image: string
+  image_url: string | null
+  display_order: number
+}
 interface ToolDTO {
   id: string
   title: string
@@ -109,6 +118,8 @@ interface ToolDTO {
   readme: string
   tool_type: ToolType
   access_url: string | null
+  zip_file: string | null
+  zip_file_name: string | null
   tags: string
   work_categories: string[]
   effect_qualitative: string
@@ -116,6 +127,7 @@ interface ToolDTO {
   author: UserDTO
   forked_from: string | null
   aspice_processes: AspiceDTO[]
+  screenshots?: ScreenshotDTO[]
   like_count: number
   request_count: number
   liked_by_me: boolean
@@ -160,6 +172,12 @@ export function mapTool(d: ToolDTO): Tool {
     workCategories: d.work_categories ?? [],
     tags: d.tags ? d.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
     accessUrl: d.access_url ?? undefined,
+    zipFileName: d.zip_file_name ?? undefined,
+    screenshots: (d.screenshots ?? []).map((s) => ({
+      id: String(s.id),
+      url: s.image_url ?? s.image,
+      displayOrder: s.display_order,
+    })),
     author: d.author?.display_name || d.author?.username || '不明',
     forkedFrom: d.forked_from ?? undefined,
     createdAt: (d.created_at ?? '').slice(0, 10),
@@ -207,6 +225,25 @@ function toWritePayload(input: NewToolInput) {
     payload.forked_from = input.forkedFrom
   }
   return payload
+}
+
+/** zipファイルを含む multipart FormData を組み立てる。 */
+function toMultipartPayload(input: NewToolInput): FormData {
+  const fd = new FormData()
+  fd.append('title', input.title)
+  fd.append('summary', input.summary)
+  fd.append('readme', input.readme)
+  fd.append('tool_type', input.toolType)
+  fd.append('access_url', input.accessUrl ?? '')
+  fd.append('tags', input.tags.join(', '))
+  // JSONField はサーバ側で CSV/JSON文字列を許容（_coerce_string_list）
+  fd.append('work_categories', input.workCategories.join(','))
+  fd.append('aspice_process_ids', input.aspiceProcesses.join(','))
+  if (input.forkedFrom !== undefined) {
+    fd.append('forked_from', input.forkedFrom)
+  }
+  if (input.zipFile) fd.append('zip_file', input.zipFile)
+  return fd
 }
 
 // ── 認証 ──
@@ -269,24 +306,87 @@ export async function getTool(id: string): Promise<Tool> {
   return mapTool(await apiFetch<ToolDTO>(`/tools/${id}/`))
 }
 
+/** zipまたはスクリーンショットがあれば multipart、なければ JSON で送る。 */
+function hasFiles(input: NewToolInput): boolean {
+  return !!input.zipFile || (input.newScreenshots?.length ?? 0) > 0
+}
+
 export async function createTool(input: NewToolInput): Promise<Tool> {
+  const useMultipart = hasFiles(input)
   const d = await apiFetch<ToolDTO>('/tools/', {
     method: 'POST',
-    body: JSON.stringify(toWritePayload(input)),
+    body: useMultipart
+      ? toMultipartPayload(input)
+      : JSON.stringify(toWritePayload(input)),
   })
-  return mapTool(d)
+  // スクリーンショットは別エンドポイントへ追加投稿
+  for (const file of input.newScreenshots ?? []) {
+    await uploadScreenshot(d.id, file)
+  }
+  return mapTool(await apiFetch<ToolDTO>(`/tools/${d.id}/`))
 }
 
 export async function updateTool(id: string, input: NewToolInput): Promise<Tool> {
-  const d = await apiFetch<ToolDTO>(`/tools/${id}/`, {
+  const useMultipart = hasFiles(input)
+  await apiFetch<ToolDTO>(`/tools/${id}/`, {
     method: 'PATCH',
-    body: JSON.stringify(toWritePayload(input)),
+    body: useMultipart
+      ? toMultipartPayload(input)
+      : JSON.stringify(toWritePayload(input)),
   })
-  return mapTool(d)
+  for (const file of input.newScreenshots ?? []) {
+    await uploadScreenshot(id, file)
+  }
+  return mapTool(await apiFetch<ToolDTO>(`/tools/${id}/`))
+}
+
+export async function uploadScreenshot(toolId: string, image: File): Promise<void> {
+  const fd = new FormData()
+  fd.append('image', image)
+  await apiFetch<unknown>(`/tools/${toolId}/screenshots/`, {
+    method: 'POST',
+    body: fd,
+  })
+}
+
+export async function deleteScreenshot(toolId: string, screenshotId: string): Promise<void> {
+  await apiFetch<void>(`/tools/${toolId}/screenshots/${screenshotId}/`, {
+    method: 'DELETE',
+  })
 }
 
 export async function deleteTool(id: string): Promise<void> {
   await apiFetch<void>(`/tools/${id}/`, { method: 'DELETE' })
+}
+
+/** アクセス権申請の承認/却下（登録者本人または管理者のみ）。 */
+export async function resolveAccessRequest(
+  requestId: string,
+  status: 'granted' | 'rejected',
+): Promise<void> {
+  await apiFetch<unknown>(`/access-requests/${requestId}/resolve/`, {
+    method: 'POST',
+    body: JSON.stringify({ status }),
+  })
+}
+
+/** zipダウンロード(認証必須)：blobとして取得し、ブラウザに保存させる。 */
+export async function downloadZip(toolId: string, filename = 'tool.zip'): Promise<void> {
+  const token = getToken()
+  const res = await fetch(`${API_BASE}/tools/${toolId}/download/`, {
+    headers: token ? { Authorization: `Token ${token}` } : {},
+    credentials: 'omit',
+  })
+  if (!res.ok) throw new ApiError(res.status, `ダウンロードに失敗しました (${res.status})`)
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 
 export async function toggleLike(id: string): Promise<{ liked: boolean; likeCount: number }> {
@@ -301,11 +401,6 @@ export async function requestAccess(id: string, reason: string): Promise<void> {
     method: 'POST',
     body: JSON.stringify({ reason }),
   })
-}
-
-/** zip ダウンロードURL（認証はトークン付きで別途取得する想定。簡易にURLを返す） */
-export function downloadUrl(id: string): string {
-  return `${API_BASE}/tools/${id}/download/`
 }
 
 // ── /api/me/* ──

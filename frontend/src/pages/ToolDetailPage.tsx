@@ -91,16 +91,30 @@ export default function ToolDetailPage() {
             </div>
           </div>
 
-          <div className="card-panel">
-            <h3 style={{ marginTop: 0 }}>スクリーンショット</h3>
-            <div className="gallery">
-              {[1, 2, 3].map((n) => (
-                <div className="shot" key={n}>
-                  📷 screenshot {n}
-                </div>
-              ))}
+          {(tool.screenshots?.length ?? 0) > 0 ? (
+            <div className="card-panel">
+              <h3 style={{ marginTop: 0 }}>スクリーンショット</h3>
+              <div className="gallery">
+                {tool.screenshots!.map((s) => (
+                  <a
+                    key={s.id}
+                    className="shot"
+                    href={s.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      backgroundImage: `url(${JSON.stringify(s.url)})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }}
+                  >
+                    {/* 画像が読めない場合のフォールバック */}
+                    <span style={{ opacity: 0 }}>📷</span>
+                  </a>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : null}
 
           {(tool.effectQualitative || tool.effectHoursPerMonth) && (
             <div className="card-panel">
@@ -145,7 +159,7 @@ export default function ToolDetailPage() {
               {isDownload ? (
                 <button
                   className="btn btn-primary btn-lg btn-block"
-                  onClick={() => recordDownload(tool.id)}
+                  onClick={() => recordDownload(tool)}
                 >
                   📥 ダウンロード
                 </button>

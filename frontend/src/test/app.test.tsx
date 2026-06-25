@@ -234,4 +234,18 @@ describe('マイページ', () => {
       screen.getByText('A-SPICE要件トレーサビリティチェッカー'),
     ).toBeInTheDocument()
   })
+
+  it('被申請一覧の pending を承認すると承認済みに変わる', () => {
+    renderAt('/mypage')
+    fireEvent.click(
+      screen.getByRole('button', { name: /自分のツールへの被申請/ }),
+    )
+    // SEED_REQUESTS の r1: 鈴木花子 → tool1（田中太郎）
+    expect(screen.getByText('鈴木花子')).toBeInTheDocument()
+    expect(screen.getByText('申請中')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /承認/ }))
+    expect(screen.queryByText('申請中')).not.toBeInTheDocument()
+    // 既存の granted（r0）と合わせて2件表示される
+    expect(screen.getAllByText('承認済み').length).toBeGreaterThanOrEqual(1)
+  })
 })

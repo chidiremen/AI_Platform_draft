@@ -17,5 +17,10 @@ urlpatterns = [
         views.MeIncomingRequestsView.as_view(),
         name="me-incoming-requests",
     ),
+    path(
+        "access-requests/<uuid:pk>/resolve/",
+        views.AccessRequestResolveView.as_view(),
+        name="access-request-resolve",
+    ),
     path("", include(router.urls)),
 ]

@@ -1,17 +1,20 @@
 from django.db.models import Count, Q
 from django.http import FileResponse, Http404
+from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from accounts.permissions import IsAuthorOrAdminOrReadOnly, is_admin
 
-from .models import AccessRequest, Like, Tool
+from .models import AccessRequest, Like, Screenshot, Tool
 from .notifications import notify_access_request
 from .serializers import (
     AccessRequestSerializer,
+    ScreenshotSerializer,
     ToolSerializer,
     ToolWriteSerializer,
 )
@@ -181,6 +184,56 @@ class ToolViewSet(ModelViewSet):
             filename=tool.zip_file.name.split("/")[-1],
         )
 
+    # ── スクリーンショット追加（登録者本人または管理者） ──
+    @action(
+        detail=True,
+        methods=["get", "post"],
+        permission_classes=[IsAuthenticated],
+        url_path="screenshots",
+    )
+    def screenshots(self, request, pk=None):
+        tool = self.get_object()
+        if request.method == "GET":
+            qs = tool.screenshots.all()
+            return Response(
+                ScreenshotSerializer(qs, many=True, context={"request": request}).data
+            )
+        # POST: 画像アップロード
+        if not (is_admin(request.user) or tool.author_id == request.user.id):
+            raise PermissionDenied("スクリーンショット追加は登録者または管理者のみ可能です。")
+        image = request.FILES.get("image")
+        if not image:
+            return Response(
+                {"detail": "image ファイルが必要です。"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            order = int(request.data.get("display_order", 0))
+        except (TypeError, ValueError):
+            order = 0
+        shot = Screenshot.objects.create(tool=tool, image=image, display_order=order)
+        return Response(
+            ScreenshotSerializer(shot, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    # ── スクリーンショット削除 ──
+    @action(
+        detail=True,
+        methods=["delete"],
+        permission_classes=[IsAuthenticated],
+        url_path=r"screenshots/(?P<screenshot_id>[^/.]+)",
+    )
+    def delete_screenshot(self, request, pk=None, screenshot_id=None):
+        tool = self.get_object()
+        if not (is_admin(request.user) or tool.author_id == request.user.id):
+            raise PermissionDenied("スクリーンショット削除は登録者または管理者のみ可能です。")
+        shot = tool.screenshots.filter(id=screenshot_id).first()
+        if not shot:
+            raise Http404("スクリーンショットが見つかりません。")
+        shot.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 # --------------------------------------------------------------------------- #
 # /api/me/* tool-related collections
@@ -237,3 +290,39 @@ class MeIncomingRequestsView(generics.ListAPIView):
             .select_related("tool", "requester")
             .order_by("-created_at")
         )
+
+
+class AccessRequestResolveView(generics.UpdateAPIView):
+    """登録者本人または管理者が申請を承認/却下する。
+
+    POST/PATCH /api/access-requests/{id}/resolve/
+    Body: {"status": "granted" | "rejected"}
+    """
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = AccessRequestSerializer
+    queryset = AccessRequest.objects.select_related("tool", "requester")
+    http_method_names = ["post", "patch"]
+
+    def update(self, request, *args, **kwargs):
+        req = self.get_object()
+        if not (is_admin(request.user) or req.tool.author_id == request.user.id):
+            raise PermissionDenied(
+                "この申請を処理できるのは登録者本人または管理者のみです。"
+            )
+        new_status = request.data.get("status")
+        if new_status not in {
+            AccessRequest.Status.GRANTED,
+            AccessRequest.Status.REJECTED,
+        }:
+            return Response(
+                {"detail": "status は granted または rejected を指定してください。"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        req.status = new_status
+        req.resolved_at = timezone.now()
+        req.save(update_fields=["status", "resolved_at"])
+        return Response(AccessRequestSerializer(req).data)
+
+    def post(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)

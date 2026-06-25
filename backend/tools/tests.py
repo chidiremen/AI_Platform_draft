@@ -4,9 +4,11 @@ Regression focus: creating a tool returned 403 in real-API mode. With token
 authentication (and Token listed before Session auth), a token-bearing request
 must create a tool successfully even when CSRF checks are enforced.
 """
+from io import BytesIO
 from unittest import mock
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from rest_framework import status
 from rest_framework.authtoken.models import Token
@@ -162,3 +164,189 @@ class AccessRequestNotificationTests(APITestCase):
         body = sent.data.decode("utf-8")
         self.assertIn(self.tool.title, body)
         self.assertIn("申請者", body)
+
+
+class MultipartAndFileTests(APITestCase):
+    """multipart でのツール登録、スクリーンショット追加、ZIPダウンロードのE2E。"""
+
+    def setUp(self):
+        self.author = User.objects.create_user(
+            username="auth", password="pw", role="member", display_name="作者"
+        )
+        self.other = User.objects.create_user(
+            username="other", password="pw", role="member"
+        )
+
+    def _auth_client(self, user):
+        token, _ = Token.objects.get_or_create(user=user)
+        c = APIClient()
+        c.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+        return c
+
+    def test_create_tool_with_zip_via_multipart(self):
+        zip_bytes = b"PK\x03\x04dummyzip"
+        zip_file = SimpleUploadedFile(
+            "sample.zip", zip_bytes, content_type="application/zip"
+        )
+        client = self._auth_client(self.author)
+        res = client.post(
+            "/api/tools/",
+            {
+                "title": "zipツール",
+                "summary": "概要",
+                "readme": "## R",
+                "tool_type": "zip_upload",
+                # CSV 受け入れの動作確認
+                "work_categories": "meeting,document",
+                "aspice_process_ids": "",
+                "zip_file": zip_file,
+            },
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        # ストレージは衝突時にサフィックスを付ける場合があるため部分一致で判定
+        self.assertIn("sample", res.data["zip_file_name"])
+        self.assertTrue(res.data["zip_file_name"].endswith(".zip"))
+        self.assertEqual(res.data["work_categories"], ["meeting", "document"])
+
+    def test_multipart_without_is_published_keeps_default_true(self):
+        """回帰: multipart で is_published が未送信のとき DRF が False に倒すバグ。"""
+        client = self._auth_client(self.author)
+        res = client.post(
+            "/api/tools/",
+            {
+                "title": "t",
+                "summary": "s",
+                "readme": "r",
+                "tool_type": "copilot_agent",
+                "work_categories": "meeting",
+            },
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(res.data["is_published"])
+
+    def test_work_categories_accepts_json_string(self):
+        client = self._auth_client(self.author)
+        res = client.post(
+            "/api/tools/",
+            {
+                "title": "t",
+                "summary": "s",
+                "readme": "r",
+                "tool_type": "copilot_agent",
+                "work_categories": '["meeting","mail"]',
+            },
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data["work_categories"], ["meeting", "mail"])
+
+    def test_post_screenshot_and_appears_in_detail(self):
+        tool = Tool.objects.create(
+            title="t", summary="s", readme="r", tool_type="copilot_agent", author=self.author
+        )
+        # 1x1 PNG
+        png = (
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+            b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xfc\xff"
+            b"\xff?\x00\x05\xfe\x02\xfeA-?\xb0\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+        image = SimpleUploadedFile("a.png", png, content_type="image/png")
+        client = self._auth_client(self.author)
+        res = client.post(
+            f"/api/tools/{tool.id}/screenshots/",
+            {"image": image, "display_order": "1"},
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        # 詳細にスクリーンショットが含まれる
+        detail = client.get(f"/api/tools/{tool.id}/")
+        self.assertEqual(len(detail.data["screenshots"]), 1)
+        self.assertTrue(detail.data["screenshots"][0]["image_url"])
+
+    def test_member_cannot_add_screenshot_to_others_tool(self):
+        tool = Tool.objects.create(
+            title="t", summary="s", readme="r", tool_type="copilot_agent", author=self.author
+        )
+        png = b"\x89PNG\r\n\x1a\n"
+        image = SimpleUploadedFile("a.png", png, content_type="image/png")
+        client = self._auth_client(self.other)
+        res = client.post(
+            f"/api/tools/{tool.id}/screenshots/",
+            {"image": image},
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_zip_download_returns_file(self):
+        tool = Tool.objects.create(
+            title="t", summary="s", readme="r", tool_type="zip_upload", author=self.author
+        )
+        tool.zip_file.save("a.zip", BytesIO(b"PKzipdata"), save=True)
+        client = self._auth_client(self.author)
+        res = client.get(f"/api/tools/{tool.id}/download/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        # FileResponse のヘッダ
+        self.assertIn("attachment", res.headers.get("Content-Disposition", ""))
+
+
+class AccessRequestResolveTests(APITestCase):
+    def setUp(self):
+        self.author = User.objects.create_user(
+            username="auth", password="pw", role="member"
+        )
+        self.requester = User.objects.create_user(
+            username="req", password="pw", role="member"
+        )
+        self.other = User.objects.create_user(
+            username="other", password="pw", role="member"
+        )
+        self.admin = User.objects.create_superuser(username="root2", password="pw")
+        self.tool = Tool.objects.create(
+            title="t", summary="s", readme="r", tool_type="copilot_agent", author=self.author
+        )
+        self.req = AccessRequest.objects.create(
+            requester=self.requester, tool=self.tool, reason="r"
+        )
+
+    def _client(self, user):
+        token, _ = Token.objects.get_or_create(user=user)
+        c = APIClient()
+        c.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+        return c
+
+    def test_author_can_grant(self):
+        res = self._client(self.author).post(
+            f"/api/access-requests/{self.req.id}/resolve/",
+            {"status": "granted"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "granted")
+        self.assertIsNotNone(res.data["resolved_at"])
+
+    def test_admin_can_reject(self):
+        res = self._client(self.admin).post(
+            f"/api/access-requests/{self.req.id}/resolve/",
+            {"status": "rejected"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["status"], "rejected")
+
+    def test_third_party_member_cannot_resolve(self):
+        res = self._client(self.other).post(
+            f"/api/access-requests/{self.req.id}/resolve/",
+            {"status": "granted"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_invalid_status_rejected(self):
+        res = self._client(self.author).post(
+            f"/api/access-requests/{self.req.id}/resolve/",
+            {"status": "in_review"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)

@@ -10,6 +10,8 @@ function toolDTO(id: string, overrides: Record<string, unknown> = {}) {
     readme: 'r',
     tool_type: 'copilot_agent',
     access_url: null,
+    zip_file: null,
+    zip_file_name: null,
     tags: '',
     work_categories: [],
     effect_qualitative: '',
@@ -17,6 +19,7 @@ function toolDTO(id: string, overrides: Record<string, unknown> = {}) {
     author: { id: 1, username: 'm', display_name: 'M', role: 'member', email: '' },
     forked_from: null,
     aspice_processes: [],
+    screenshots: [],
     like_count: 0,
     request_count: 0,
     liked_by_me: false,
@@ -56,6 +59,8 @@ describe('API マッパー（バックエンドDTO → フロント型）', () =
       readme: '## R',
       tool_type: 'copilot_agent',
       access_url: 'https://example.com',
+      zip_file: null,
+      zip_file_name: null,
       tags: 'a, b ,c',
       work_categories: ['meeting'],
       effect_qualitative: '効果',
@@ -69,6 +74,7 @@ describe('API マッパー（バックエンドDTO → フロント型）', () =
       },
       forked_from: null,
       aspice_processes: [{ id: 'SWE.1' }, { id: 'SWE.2' }],
+      screenshots: [],
       like_count: 5,
       request_count: 3,
       liked_by_me: true,
@@ -96,6 +102,8 @@ describe('API マッパー（バックエンドDTO → フロント型）', () =
       readme: '',
       tool_type: 'zip_upload',
       access_url: null,
+      zip_file: '/media/tool_zips/a.zip',
+      zip_file_name: 'a.zip',
       tags: '',
       work_categories: [],
       effect_qualitative: '',
@@ -103,6 +111,7 @@ describe('API マッパー（バックエンドDTO → フロント型）', () =
       author: { id: 1, username: 'x', display_name: '', role: 'member', email: '' },
       forked_from: null,
       aspice_processes: [],
+      screenshots: [],
       like_count: 0,
       request_count: 0,
       liked_by_me: false,
@@ -110,6 +119,7 @@ describe('API マッパー（バックエンドDTO → フロント型）', () =
       updated_at: '2026-01-01T00:00:00Z',
     })
     expect(t.downloads).toBe(0)
+    expect(t.zipFileName).toBe('a.zip')
     expect(t.tags).toEqual([])
     expect(t.aspiceProcesses).toEqual([])
   })
@@ -166,11 +176,13 @@ describe('APIクライアントの認証ヘッダ（回帰: 403 CSRFを防ぐ）
       workCategories: [],
     })
 
-    expect(calls).toHaveLength(1)
-    const { init } = calls[0]
-    expect(init.method).toBe('POST')
-    expect(init.credentials).toBe('omit')
-    expect((init.headers as Record<string, string>)['Authorization']).toBe('Token tok-123')
+    // createTool は POST → 取得用GETの順に2回 fetch する
+    const post = calls.find((c) => c.init.method === 'POST')
+    expect(post).toBeDefined()
+    expect(post!.init.credentials).toBe('omit')
+    expect(
+      (post!.init.headers as Record<string, string>)['Authorization'],
+    ).toBe('Token tok-123')
   })
 })
 
@@ -205,7 +217,7 @@ describe('ツール書き込みペイロード（回帰: 編集でフォーク�
     vi.stubGlobal(
       'fetch',
       vi.fn(async (_url: string, init: RequestInit) => {
-        body = JSON.parse(init.body as string)
+        if (typeof init?.body === 'string') body = JSON.parse(init.body)
         return jsonResponse(toolDTO('new'), 201)
       }),
     )
@@ -222,14 +234,17 @@ describe('ツール書き込みペイロード（回帰: 編集でフォーク�
     expect(body.forked_from).toBe('src-id')
   })
 
-  it('updateTool(編集) は forked_from を送らない（PATCHで上書きしない）', async () => {
-    let body: Record<string, unknown> = {}
-    let method = ''
+  it('updateTool(編集) は PATCH で送り forked_from を含めない', async () => {
+    const methods: string[] = []
+    let patchBody: Record<string, unknown> | null = null
     vi.stubGlobal(
       'fetch',
       vi.fn(async (_url: string, init: RequestInit) => {
-        body = JSON.parse(init.body as string)
-        method = init.method as string
+        const m = (init?.method ?? 'GET') as string
+        methods.push(m)
+        if (m === 'PATCH' && typeof init?.body === 'string') {
+          patchBody = JSON.parse(init.body)
+        }
         return jsonResponse(toolDTO('x'))
       }),
     )
@@ -241,9 +256,39 @@ describe('ツール書き込みペイロード（回帰: 編集でフォーク�
       tags: [],
       aspiceProcesses: [],
       workCategories: [],
-      // forkedFrom 未指定（編集モード）
     })
-    expect(method).toBe('PATCH')
-    expect('forked_from' in body).toBe(false)
+    expect(methods).toContain('PATCH')
+    expect(patchBody).not.toBeNull()
+    expect('forked_from' in (patchBody as unknown as Record<string, unknown>)).toBe(false)
+  })
+
+  it('createTool は zipFile が指定されると multipart で送信する', async () => {
+    let sentBody: BodyInit | null | undefined
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        if (init.method === 'POST' && _url.endsWith('/tools/')) {
+          sentBody = init.body
+        }
+        return jsonResponse(toolDTO('new', { zip_file_name: 'a.zip' }), 201)
+      }),
+    )
+    const file = new File(['fake'], 'a.zip', { type: 'application/zip' })
+    await createTool({
+      title: 't',
+      summary: 's',
+      readme: 'r',
+      toolType: 'zip_upload',
+      tags: [],
+      aspiceProcesses: [],
+      workCategories: ['meeting'],
+      zipFile: file,
+    })
+    expect(sentBody).toBeInstanceOf(FormData)
+    const fd = sentBody as FormData
+    expect(fd.get('title')).toBe('t')
+    expect(fd.get('tool_type')).toBe('zip_upload')
+    expect(fd.get('work_categories')).toBe('meeting')
+    expect(fd.get('zip_file')).toBe(file)
   })
 })

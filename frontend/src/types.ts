@@ -23,6 +23,14 @@ export interface AspiceProcess {
   y: number
 }
 
+/** ツール内に保持するスクリーンショット情報 */
+export interface ScreenshotInfo {
+  id: string
+  /** 表示用URL（実APIモードでは絶対URL、モックではObjectURLまたはdata URL） */
+  url: string
+  displayOrder: number
+}
+
 /** ツール（モックデータ） */
 export interface Tool {
   id: string
@@ -34,6 +42,10 @@ export interface Tool {
   workCategories?: string[] // 業務カテゴリ id の配列（A-SPICEと別軸の業務シーン分類）
   tags?: string[]
   accessUrl?: string
+  /** zipの元ファイル名（表示用、実APIモードのみ） */
+  zipFileName?: string
+  /** スクリーンショット一覧 */
+  screenshots?: ScreenshotInfo[]
   author: string
   forkedFrom?: string // フォーク元ツール id
   createdAt: string

@@ -37,6 +37,10 @@ export interface NewToolInput {
   aspiceProcesses: string[]
   workCategories: string[]
   forkedFrom?: string
+  /** zipファイル（ある場合 multipart 送信） */
+  zipFile?: File | null
+  /** 新規追加するスクリーンショット（複数） */
+  newScreenshots?: File[]
 }
 
 interface AppState {
@@ -61,9 +65,12 @@ interface AppState {
   requests: AccessRequestRecord[]
   toggleLike: (toolId: string) => void
   submitRequest: (tool: Tool, reason: string) => void
-  recordDownload: (toolId: string) => void
+  /** zipダウンロード（モック=カウント増、API=実ダウンロード+カウント） */
+  recordDownload: (tool: Tool) => void
   /** ファネル計測（impression/view/readme_scroll）。セッション内で重複排除。 */
   recordActivity: (toolId: string, action: 'impression' | 'view' | 'readme_scroll') => void
+  /** 申請の承認/却下（登録者本人または管理者）。 */
+  resolveRequest: (requestId: string, status: 'granted' | 'rejected') => Promise<void>
   // 権限ヘルパ
   canEdit: (tool: Tool) => boolean
   toast: (msg: string) => void
@@ -95,6 +102,18 @@ const SEED_REQUESTS: AccessRequestRecord[] = [
     reason: '担当ECUのコードレビュー自動化に利用したいため',
     status: 'granted',
     createdAt: '2026-06-05',
+  },
+  // tool 1 (田中太郎 = 管理者) への保留中の申請。マイページ「被申請一覧」で
+  // 承認/却下フローを動かすために初期投入する。
+  {
+    id: 'r1',
+    toolId: '1',
+    toolTitle: 'A-SPICE要件トレーサビリティチェッカー',
+    requester: '鈴木花子',
+    author: '田中太郎',
+    reason: '要件レビュー会の準備に使いたい',
+    status: 'pending',
+    createdAt: '2026-06-12',
   },
 ]
 
@@ -387,12 +406,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
   )
 
   const recordDownload = useCallback(
-    (toolId: string) => {
+    (tool: Tool) => {
       setTools((ts) =>
-        ts.map((t) => (t.id === toolId ? { ...t, downloads: (t.downloads ?? 0) + 1 } : t)),
+        ts.map((t) => (t.id === tool.id ? { ...t, downloads: (t.downloads ?? 0) + 1 } : t)),
       )
-      if (!USE_MOCK) void api.postActivity([{ tool: toolId, action: 'download' }])
-      toast('📥 ダウンロードを開始しました（デモ）')
+      if (!USE_MOCK) {
+        const filename = tool.zipFileName || `${tool.title}.zip`
+        api
+          .downloadZip(tool.id, filename)
+          .then(() => api.postActivity([{ tool: tool.id, action: 'download' }]))
+          .catch((e) =>
+            toast(`📥 ダウンロードに失敗しました: ${e instanceof Error ? e.message : ''}`),
+          )
+      } else {
+        toast('📥 ダウンロードを開始しました（デモ）')
+      }
+    },
+    [toast],
+  )
+
+  // ── アクセス権申請の承認/却下 ──
+  const resolveRequest = useCallback(
+    async (requestId: string, status: 'granted' | 'rejected') => {
+      if (!USE_MOCK) await api.resolveAccessRequest(requestId, status)
+      setRequests((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, status } : r)),
+      )
+      toast(status === 'granted' ? '✅ 申請を承認しました' : '🚫 申請を却下しました')
     },
     [toast],
   )
@@ -440,6 +480,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       submitRequest,
       recordDownload,
       recordActivity,
+      resolveRequest,
       canEdit,
       toast,
     }),
@@ -461,6 +502,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       submitRequest,
       recordDownload,
       recordActivity,
+      resolveRequest,
       canEdit,
       toast,
     ],

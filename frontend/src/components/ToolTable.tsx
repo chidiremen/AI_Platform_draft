@@ -96,7 +96,7 @@ interface RowProps {
   cols: ColumnDef[]
   liked: boolean
   onToggleLike: (id: string) => void
-  onDownload: (id: string) => void
+  onDownload: (tool: Tool) => void
   onRequest: (tool: Tool) => void
 }
 
@@ -125,7 +125,7 @@ function ToolTableRow({ tool, cols, liked, onToggleLike, onDownload, onRequest }
           </button>
 
           {isZip ? (
-            <button className="btn-sm btn-primary" onClick={() => onDownload(tool.id)}>
+            <button className="btn-sm btn-primary" onClick={() => onDownload(tool)}>
               📥 DL
             </button>
           ) : (
