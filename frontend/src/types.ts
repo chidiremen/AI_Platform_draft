@@ -62,3 +62,19 @@ export interface Tool {
 }
 
 export type SortKey = 'newest' | 'likes' | 'requests' | 'views' | 'name_asc' | 'downloads'
+
+/** コメント種別（バックエンドの Comment.Kind と一致） */
+export type CommentType = 'bug' | 'feature' | 'question' | 'general'
+
+/** コメント1件 */
+export interface ToolComment {
+  id: string
+  toolId: string
+  author: string
+  body: string
+  commentType: CommentType
+  parent?: string | null
+  createdAt: string
+  likeCount: number
+  likedByMe: boolean
+}

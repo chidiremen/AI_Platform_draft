@@ -10,10 +10,11 @@ from rest_framework.viewsets import ModelViewSet
 
 from accounts.permissions import IsAuthorOrAdminOrReadOnly, is_admin
 
-from .models import AccessRequest, Like, Screenshot, Tool
+from .models import AccessRequest, Comment, CommentLike, Like, Screenshot, Tool
 from .notifications import notify_access_request
 from .serializers import (
     AccessRequestSerializer,
+    CommentSerializer,
     ScreenshotSerializer,
     ToolSerializer,
     ToolWriteSerializer,
@@ -326,3 +327,83 @@ class AccessRequestResolveView(generics.UpdateAPIView):
 
     def post(self, request, *args, **kwargs):
         return self.update(request, *args, **kwargs)
+
+
+# --------------------------------------------------------------------------- #
+# Comments
+# --------------------------------------------------------------------------- #
+class ToolCommentsView(generics.ListCreateAPIView):
+    """List or create comments on a tool. Reads are public, writes require auth.
+
+    GET /api/tools/{tool_id}/comments/
+    POST /api/tools/{tool_id}/comments/  body: {body, comment_type, parent}
+    """
+
+    serializer_class = CommentSerializer
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsAuthenticated()]
+        return []
+
+    def get_queryset(self):
+        tool_id = self.kwargs.get("tool_id")
+        return (
+            Comment.objects.filter(tool_id=tool_id)
+            .select_related("author")
+            .prefetch_related("likes", "replies")
+            .order_by("created_at")
+        )
+
+    def perform_create(self, serializer):
+        tool_id = self.kwargs.get("tool_id")
+        tool = Tool.objects.filter(id=tool_id).first()
+        if not tool:
+            raise Http404("ツールが見つかりません。")
+        serializer.save(author=self.request.user, tool=tool)
+
+
+class CommentDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Edit or delete a comment. Only the author or an admin may modify."""
+
+    serializer_class = CommentSerializer
+    queryset = Comment.objects.select_related("author").prefetch_related(
+        "likes", "replies"
+    )
+    permission_classes = [IsAuthenticated]
+
+    def perform_update(self, serializer):
+        comment = self.get_object()
+        if not (is_admin(self.request.user) or comment.author_id == self.request.user.id):
+            raise PermissionDenied("コメントの編集は投稿者または管理者のみ可能です。")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if not (is_admin(self.request.user) or instance.author_id == self.request.user.id):
+            raise PermissionDenied("コメントの削除は投稿者または管理者のみ可能です。")
+        instance.delete()
+
+
+class CommentLikeView(generics.GenericAPIView):
+    """Toggle like for a comment.
+
+    POST /api/comments/{comment_id}/like/  -> {liked, like_count}
+    """
+
+    permission_classes = [IsAuthenticated]
+    queryset = Comment.objects.all()
+    lookup_url_kwarg = "comment_id"
+
+    def post(self, request, *args, **kwargs):
+        comment = self.get_object()
+        existing = CommentLike.objects.filter(
+            comment=comment, user=request.user
+        ).first()
+        if existing:
+            existing.delete()
+            liked = False
+        else:
+            CommentLike.objects.create(comment=comment, user=request.user)
+            liked = True
+        like_count = CommentLike.objects.filter(comment=comment).count()
+        return Response({"liked": liked, "like_count": like_count})

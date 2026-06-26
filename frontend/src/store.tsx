@@ -8,7 +8,7 @@ import {
   useState,
 } from 'react'
 import type { ReactNode } from 'react'
-import type { Tool } from './types'
+import type { CommentType, Tool, ToolComment } from './types'
 import { MOCK_TOOLS } from './data/tools'
 import { MOCK_USERS, type Role, type User } from './data/users'
 import { USE_MOCK } from './config'
@@ -73,8 +73,18 @@ interface AppState {
   recordActivity: (toolId: string, action: 'impression' | 'view' | 'readme_scroll') => void
   /** 申請の承認/却下（登録者本人または管理者）。 */
   resolveRequest: (requestId: string, status: 'granted' | 'rejected') => Promise<void>
+  // コメント
+  getComments: (toolId: string) => ToolComment[]
+  loadComments: (toolId: string) => Promise<void>
+  addComment: (
+    toolId: string,
+    input: { body: string; commentType: CommentType; parent?: string | null },
+  ) => Promise<void>
+  removeComment: (commentId: string) => Promise<void>
+  toggleCommentLike: (commentId: string) => Promise<void>
   // 権限ヘルパ
   canEdit: (tool: Tool) => boolean
+  canDeleteComment: (comment: ToolComment) => boolean
   toast: (msg: string) => void
 }
 
@@ -93,6 +103,42 @@ function loadSession(users: User[]): User | null {
     return null
   }
 }
+
+const SEED_COMMENTS: ToolComment[] = [
+  {
+    id: 'c1',
+    toolId: '1',
+    author: '鈴木花子',
+    body: 'CSV取り込み時に文字コードSJISだとエラーになります。UTF-8だと問題ありません。',
+    commentType: 'bug',
+    parent: null,
+    createdAt: '2026-06-18T09:30:00Z',
+    likeCount: 3,
+    likedByMe: false,
+  },
+  {
+    id: 'c2',
+    toolId: '1',
+    author: '田中太郎',
+    body: '報告ありがとうございます。次のリリースでSJIS自動判別を入れる予定です。',
+    commentType: 'general',
+    parent: 'c1',
+    createdAt: '2026-06-18T11:00:00Z',
+    likeCount: 1,
+    likedByMe: false,
+  },
+  {
+    id: 'c3',
+    toolId: '1',
+    author: '佐藤一郎',
+    body: '出力フォーマットにJSONも対応してほしいです。',
+    commentType: 'feature',
+    parent: null,
+    createdAt: '2026-06-20T15:10:00Z',
+    likeCount: 5,
+    likedByMe: false,
+  },
+]
 
 const SEED_REQUESTS: AccessRequestRecord[] = [
   {
@@ -129,6 +175,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [requests, setRequests] = useState<AccessRequestRecord[]>(
     USE_MOCK ? SEED_REQUESTS : [],
   )
+  const [comments, setComments] = useState<ToolComment[]>(USE_MOCK ? SEED_COMMENTS : [])
+  // API モードで「すでにフェッチ済みの toolId」を覚えておき、再描画ごとに
+  // 再取得しないようにする。
+  const commentsLoaded = useRef<Set<string>>(new Set())
   const [toastMsg, setToastMsg] = useState<string | null>(null)
   const [loading, setLoading] = useState<boolean>(!USE_MOCK)
   // ファネル計測の重複排除（action:toolId をセッション内で一度だけ計上）
@@ -470,6 +520,119 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [toast],
   )
 
+  // ── コメント ──
+  const getComments = useCallback(
+    (toolId: string) => comments.filter((c) => c.toolId === toolId),
+    [comments],
+  )
+
+  const loadComments = useCallback(async (toolId: string) => {
+    if (USE_MOCK) return // モックは初期投入済み
+    if (commentsLoaded.current.has(toolId)) return
+    commentsLoaded.current.add(toolId)
+    try {
+      const fetched = await api.listComments(toolId)
+      setComments((prev) => {
+        const others = prev.filter((c) => c.toolId !== toolId)
+        return [...others, ...fetched]
+      })
+    } catch {
+      // 失敗時は次回再試行可能にする
+      commentsLoaded.current.delete(toolId)
+    }
+  }, [])
+
+  const addComment = useCallback(
+    async (
+      toolId: string,
+      input: { body: string; commentType: CommentType; parent?: string | null },
+    ) => {
+      if (!currentUser) return
+      if (!USE_MOCK) {
+        const created = await api.createComment(toolId, input)
+        setComments((prev) => [...prev, created])
+        toast('💬 コメントを投稿しました')
+        return
+      }
+      const local: ToolComment = {
+        id: `c${Date.now()}`,
+        toolId,
+        author: currentUser.name,
+        body: input.body,
+        commentType: input.commentType,
+        parent: input.parent ?? null,
+        createdAt: new Date().toISOString(),
+        likeCount: 0,
+        likedByMe: false,
+      }
+      setComments((prev) => [...prev, local])
+      toast('💬 コメントを投稿しました')
+    },
+    [currentUser, toast],
+  )
+
+  const removeComment = useCallback(
+    async (commentId: string) => {
+      if (!USE_MOCK) {
+        await api.deleteComment(commentId)
+      }
+      // 子コメント（replies）も連鎖削除
+      setComments((prev) => {
+        const toDelete = new Set<string>([commentId])
+        let changed = true
+        while (changed) {
+          changed = false
+          for (const c of prev) {
+            if (c.parent && toDelete.has(c.parent) && !toDelete.has(c.id)) {
+              toDelete.add(c.id)
+              changed = true
+            }
+          }
+        }
+        return prev.filter((c) => !toDelete.has(c.id))
+      })
+      toast('🗑️ コメントを削除しました')
+    },
+    [toast],
+  )
+
+  const toggleCommentLike = useCallback(
+    async (commentId: string) => {
+      // 楽観更新
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === commentId
+            ? {
+                ...c,
+                likedByMe: !c.likedByMe,
+                likeCount: c.likedByMe ? Math.max(0, c.likeCount - 1) : c.likeCount + 1,
+              }
+            : c,
+        ),
+      )
+      if (!USE_MOCK) {
+        try {
+          const { liked, likeCount } = await api.toggleCommentLike(commentId)
+          setComments((prev) =>
+            prev.map((c) =>
+              c.id === commentId ? { ...c, likedByMe: liked, likeCount } : c,
+            ),
+          )
+        } catch {
+          /* 楽観のまま */
+        }
+      }
+    },
+    [],
+  )
+
+  const canDeleteComment = useCallback(
+    (comment: ToolComment) =>
+      !!currentUser &&
+      (currentUser.role === 'admin' || comment.author === currentUser.name),
+    [currentUser],
+  )
+
   // ── ファネル計測（impression / view / readme_scroll）──
   const recordActivity = useCallback(
     (toolId: string, action: 'impression' | 'view' | 'readme_scroll') => {
@@ -514,7 +677,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       recordDownload,
       recordActivity,
       resolveRequest,
+      getComments,
+      loadComments,
+      addComment,
+      removeComment,
+      toggleCommentLike,
       canEdit,
+      canDeleteComment,
       toast,
     }),
     [
@@ -536,7 +705,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       recordDownload,
       recordActivity,
       resolveRequest,
+      getComments,
+      loadComments,
+      addComment,
+      removeComment,
+      toggleCommentLike,
       canEdit,
+      canDeleteComment,
       toast,
     ],
   )

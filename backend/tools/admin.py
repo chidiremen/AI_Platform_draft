@@ -3,6 +3,8 @@ from django.contrib import admin
 from .models import (
     AccessRequest,
     AspiceProcess,
+    Comment,
+    CommentLike,
     Like,
     Screenshot,
     Tool,
@@ -65,3 +67,17 @@ class AccessRequestAdmin(admin.ModelAdmin):
 class ScreenshotAdmin(admin.ModelAdmin):
     list_display = ("id", "tool", "display_order")
     raw_id_fields = ("tool",)
+
+
+@admin.register(Comment)
+class CommentAdmin(admin.ModelAdmin):
+    list_display = ("id", "tool", "author", "comment_type", "parent", "created_at")
+    list_filter = ("comment_type",)
+    search_fields = ("body",)
+    raw_id_fields = ("tool", "author", "parent")
+
+
+@admin.register(CommentLike)
+class CommentLikeAdmin(admin.ModelAdmin):
+    list_display = ("user", "comment", "created_at")
+    raw_id_fields = ("user", "comment")

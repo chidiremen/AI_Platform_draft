@@ -350,3 +350,95 @@ class AccessRequestResolveTests(APITestCase):
             format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class CommentTests(APITestCase):
+    """Comment posting / replies / likes / edit / delete permissions."""
+
+    def setUp(self):
+        self.author = User.objects.create_user(
+            username="author", password="pw", role="member", display_name="作者"
+        )
+        self.other = User.objects.create_user(
+            username="other", password="pw", role="member", display_name="他人"
+        )
+        self.admin = User.objects.create_superuser(username="root", password="pw")
+        self.tool = Tool.objects.create(
+            title="t", summary="s", readme="r", tool_type="other", author=self.author
+        )
+
+    def test_post_and_list_comments(self):
+        client = token_client(self.other)
+        res = client.post(
+            f"/api/tools/{self.tool.id}/comments/",
+            {"body": "バグです", "comment_type": "bug"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        self.assertEqual(res.data["author"]["username"], "other")
+        self.assertEqual(res.data["comment_type"], "bug")
+
+        res2 = self.client.get(f"/api/tools/{self.tool.id}/comments/")
+        self.assertEqual(res2.status_code, status.HTTP_200_OK)
+        # paginated: results キー or list
+        data = res2.data["results"] if isinstance(res2.data, dict) else res2.data
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["body"], "バグです")
+
+    def test_unauthenticated_cannot_post(self):
+        res = self.client.post(
+            f"/api/tools/{self.tool.id}/comments/",
+            {"body": "anon", "comment_type": "general"},
+            format="json",
+        )
+        self.assertIn(
+            res.status_code,
+            (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN),
+        )
+
+    def test_reply_threading(self):
+        client = token_client(self.author)
+        parent = client.post(
+            f"/api/tools/{self.tool.id}/comments/",
+            {"body": "親", "comment_type": "general"},
+            format="json",
+        )
+        self.assertEqual(parent.status_code, status.HTTP_201_CREATED)
+        reply = token_client(self.other).post(
+            f"/api/tools/{self.tool.id}/comments/",
+            {"body": "返信", "comment_type": "general", "parent": parent.data["id"]},
+            format="json",
+        )
+        self.assertEqual(reply.status_code, status.HTTP_201_CREATED, reply.data)
+        self.assertEqual(str(reply.data["parent"]), str(parent.data["id"]))
+
+    def test_toggle_like(self):
+        client = token_client(self.author)
+        comment = client.post(
+            f"/api/tools/{self.tool.id}/comments/",
+            {"body": "本文", "comment_type": "general"},
+            format="json",
+        ).data
+        cid = comment["id"]
+        liker = token_client(self.other)
+        res1 = liker.post(f"/api/comments/{cid}/like/")
+        self.assertEqual(res1.status_code, status.HTTP_200_OK)
+        self.assertTrue(res1.data["liked"])
+        self.assertEqual(res1.data["like_count"], 1)
+        res2 = liker.post(f"/api/comments/{cid}/like/")
+        self.assertFalse(res2.data["liked"])
+        self.assertEqual(res2.data["like_count"], 0)
+
+    def test_only_author_or_admin_can_delete(self):
+        client = token_client(self.author)
+        cid = client.post(
+            f"/api/tools/{self.tool.id}/comments/",
+            {"body": "本文", "comment_type": "general"},
+            format="json",
+        ).data["id"]
+        # 他人は削除不可
+        res = token_client(self.other).delete(f"/api/comments/{cid}/")
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        # 管理者は削除可
+        res2 = token_client(self.admin).delete(f"/api/comments/{cid}/")
+        self.assertEqual(res2.status_code, status.HTTP_204_NO_CONTENT)

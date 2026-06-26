@@ -6,6 +6,8 @@ import { useApp } from '../store'
 import { AspiceBadge, ToolTypeBadge, WorkCategoryBadge } from '../components/Badges'
 import RequestModal from '../components/RequestModal'
 import ConfirmModal from '../components/ConfirmModal'
+import Lightbox from '../components/Lightbox'
+import CommentSection from '../components/CommentSection'
 import { TOOL_TYPE_MAP } from '../data/toolTypes'
 import { useReadmeScroll } from '../hooks/useActivity'
 
@@ -24,6 +26,7 @@ export default function ToolDetailPage() {
   } = useApp()
   const [showModal, setShowModal] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   // 詳細ページ閲覧（view）を記録。README到達は useReadmeScroll で記録。
   useEffect(() => {
@@ -106,13 +109,13 @@ export default function ToolDetailPage() {
             <h3 style={{ marginTop: 0 }}>スクリーンショット</h3>
             {(tool.screenshots?.length ?? 0) > 0 ? (
               <div className="gallery">
-                {tool.screenshots!.map((s) => (
-                  <a
+                {tool.screenshots!.map((s, i) => (
+                  <button
                     key={s.id}
+                    type="button"
                     className="shot"
-                    href={s.url}
-                    target="_blank"
-                    rel="noreferrer"
+                    onClick={() => setLightboxIndex(i)}
+                    aria-label={`スクリーンショット ${i + 1} を拡大表示`}
                     style={{
                       backgroundImage: `url(${JSON.stringify(s.url)})`,
                       backgroundSize: 'cover',
@@ -120,7 +123,7 @@ export default function ToolDetailPage() {
                     }}
                   >
                     <span style={{ opacity: 0 }}>📷</span>
-                  </a>
+                  </button>
                 ))}
               </div>
             ) : (
@@ -273,6 +276,17 @@ export default function ToolDetailPage() {
           }}
         />
       )}
+
+      {lightboxIndex != null && tool.screenshots && (
+        <Lightbox
+          screenshots={tool.screenshots}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
+      )}
+
+      {/* コメントセクション（詳細ページ下部） */}
+      <CommentSection toolId={tool.id} />
     </div>
   )
 }

@@ -131,7 +131,9 @@ describe('いいねトグル（回帰: StrictMode で二重カウントしない
   it('いいねを押すとカウントが +1 され、+2 にはならない', () => {
     renderAt('/tools/1', true)
     expect(screen.getByText('24')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /♡ いいね/ }))
+    // サイドバーの「いいね」ボタン（btn-like クラス）を限定
+    const likeBtn = document.querySelector('.btn-like') as HTMLElement
+    fireEvent.click(likeBtn)
     expect(screen.getByText('25')).toBeInTheDocument()
     expect(screen.queryByText('26')).not.toBeInTheDocument()
   })
@@ -150,19 +152,21 @@ describe('ツールの編集・削除（登録者・管理者）', () => {
   it('管理者は詳細ページに編集・削除ボタンが表示される', () => {
     renderAt('/tools/1')
     expect(screen.getByRole('button', { name: /編集（再投稿）/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /削除$/ })).toBeInTheDocument()
+    // サイドバーの削除（btn-danger）を限定
+    expect(document.querySelector('.detail-side .btn-danger')).not.toBeNull()
   })
 
   it('権限の無いメンバーには編集・削除ボタンが表示されない', () => {
     seedSession('suzuki') // 鈴木花子（メンバー、tool1 の登録者ではない）
     renderAt('/tools/1')
     expect(screen.queryByRole('button', { name: /編集（再投稿）/ })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /削除$/ })).not.toBeInTheDocument()
+    expect(document.querySelector('.detail-side .btn-danger')).toBeNull()
   })
 
   it('削除を確定するとツールが一覧から消える', async () => {
     renderAt('/tools/4') // zip_upload。管理者は削除可能
-    fireEvent.click(screen.getByRole('button', { name: /削除$/ }))
+    const delBtn = document.querySelector('.detail-side .btn-danger') as HTMLElement
+    fireEvent.click(delBtn)
     fireEvent.click(screen.getByRole('button', { name: '削除する' }))
     // 一覧へ遷移し、削除したツールは存在しない
     expect(await screen.findByText('12 件のツール')).toBeInTheDocument()
@@ -300,5 +304,74 @@ describe('マイページ', () => {
     expect(screen.queryByText('申請中')).not.toBeInTheDocument()
     // 既存の granted（r0）と合わせて2件表示される
     expect(screen.getAllByText('承認済み').length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('コメント機能', () => {
+  it('詳細ページにコメントセクションが表示され、シード値がレンダリングされる', () => {
+    renderAt('/tools/1')
+    // セクション見出し（コメント数を含む）
+    expect(screen.getByText(/💬 コメント（/)).toBeInTheDocument()
+    // SEED_COMMENTS の c1（バグ報告）の本文
+    expect(screen.getByText(/CSV取り込み時に文字コードSJIS/)).toBeInTheDocument()
+    // 種別バッジ
+    expect(screen.getAllByText(/バグ報告/).length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('コメントを投稿すると一覧に追加される', async () => {
+    renderAt('/tools/1')
+    const textarea = screen.getByPlaceholderText(/コメント本文を入力/)
+    fireEvent.change(textarea, { target: { value: 'テスト投稿です' } })
+    fireEvent.click(screen.getByRole('button', { name: /コメントを投稿/ }))
+    // 一覧（.comment-list）内に新規コメントの本文が現れる
+    const list = await screen.findByRole('list', { name: undefined }, { container: document.body })
+      .catch(() => document.querySelector('.comment-list') as HTMLElement)
+    const scope = (document.querySelector('.comment-list') ?? list) as HTMLElement
+    expect(within(scope).getByText('テスト投稿です')).toBeInTheDocument()
+  })
+
+  it('コメントの いいね を押すとカウントが +1 される', () => {
+    renderAt('/tools/1')
+    // 種別=「変更要望」の c3（佐藤一郎）の いいね 5
+    const likeBtn = screen.getByRole('button', { name: /♡ いいね（5）/ })
+    fireEvent.click(likeBtn)
+    expect(screen.getByRole('button', { name: /♥ いいね（6）/ })).toBeInTheDocument()
+  })
+
+  it('リプライ投稿はトップレベルコメントの子として表示される', () => {
+    renderAt('/tools/1')
+    const replies = screen.getAllByRole('button', { name: /↩︎ 返信/ })
+    expect(replies.length).toBeGreaterThanOrEqual(1)
+    fireEvent.click(replies[0])
+    const textarea = screen.getByPlaceholderText(/返信を入力/)
+    fireEvent.change(textarea, { target: { value: 'リプライです' } })
+    fireEvent.click(screen.getByRole('button', { name: /返信を投稿/ }))
+    const list = document.querySelector('.comment-list') as HTMLElement
+    expect(within(list).getByText('リプライです')).toBeInTheDocument()
+  })
+
+  it('種別セレクタで「バグ報告」を選んで投稿するとバッジが付く', () => {
+    renderAt('/tools/1')
+    fireEvent.change(screen.getByLabelText('種別:'), { target: { value: 'bug' } })
+    fireEvent.change(screen.getByPlaceholderText(/コメント本文を入力/), {
+      target: { value: '新しいバグ報告' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /コメントを投稿/ }))
+    const list = document.querySelector('.comment-list') as HTMLElement
+    expect(within(list).getByText('新しいバグ報告')).toBeInTheDocument()
+    // バグ報告バッジが（シード値 + 投稿分の）2件以上ある
+    expect(screen.getAllByText(/バグ報告/).length).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('スクリーンショットのライトボックス（モーダル）', () => {
+  it('スクリーンショットが無いときはライトボックスを開かない', () => {
+    // tool 1 はスクリーンショット未登録 → ボタンも無い
+    renderAt('/tools/1')
+    expect(
+      screen.queryByRole('button', { name: /スクリーンショット.*を拡大表示/ }),
+    ).not.toBeInTheDocument()
+    // <a target=_blank> は撤廃済み
+    expect(document.querySelector('a.shot')).toBeNull()
   })
 })

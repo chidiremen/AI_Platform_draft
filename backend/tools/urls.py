@@ -22,5 +22,21 @@ urlpatterns = [
         views.AccessRequestResolveView.as_view(),
         name="access-request-resolve",
     ),
+    # コメント関連
+    path(
+        "tools/<uuid:tool_id>/comments/",
+        views.ToolCommentsView.as_view(),
+        name="tool-comments",
+    ),
+    path(
+        "comments/<uuid:pk>/",
+        views.CommentDetailView.as_view(),
+        name="comment-detail",
+    ),
+    path(
+        "comments/<uuid:comment_id>/like/",
+        views.CommentLikeView.as_view(),
+        name="comment-like",
+    ),
     path("", include(router.urls)),
 ]

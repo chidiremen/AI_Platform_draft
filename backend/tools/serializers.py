@@ -5,6 +5,8 @@ from accounts.serializers import UserSerializer
 from .models import (
     AccessRequest,
     AspiceProcess,
+    Comment,
+    CommentLike,
     Like,
     Screenshot,
     Tool,
@@ -237,3 +239,47 @@ class AccessRequestSerializer(serializers.ModelSerializer):
             "created_at",
             "resolved_at",
         ]
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    """Read/write serializer for tool comments. Supports threaded replies."""
+
+    author = UserSerializer(read_only=True)
+    like_count = serializers.SerializerMethodField()
+    liked_by_me = serializers.SerializerMethodField()
+    reply_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Comment
+        fields = [
+            "id",
+            "tool",
+            "author",
+            "body",
+            "comment_type",
+            "parent",
+            "created_at",
+            "like_count",
+            "liked_by_me",
+            "reply_count",
+        ]
+        read_only_fields = ["id", "author", "tool", "created_at"]
+
+    def get_like_count(self, obj) -> int:
+        return obj.likes.count()
+
+    def get_liked_by_me(self, obj) -> bool:
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return obj.likes.filter(user=request.user).exists()
+
+    def get_reply_count(self, obj) -> int:
+        return obj.replies.count()
+
+
+class CommentLikeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CommentLike
+        fields = ["id", "comment", "user", "created_at"]
+        read_only_fields = fields

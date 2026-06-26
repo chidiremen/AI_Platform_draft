@@ -4,7 +4,7 @@
  * バックエンドの snake_case レスポンスをフロントの型へマッピングする。
  */
 import { API_BASE, TOKEN_KEY } from '../config'
-import type { Tool, ToolType } from '../types'
+import type { CommentType, Tool, ToolComment, ToolType } from '../types'
 import type { Role, User } from '../data/users'
 import type { AccessRequestRecord, NewToolInput } from '../store'
 
@@ -491,6 +491,67 @@ export interface DashboardSummary {
 }
 export async function dashboardSummary(): Promise<DashboardSummary> {
   return apiFetch<DashboardSummary>('/dashboard/summary/')
+}
+
+// ── コメント ──
+interface CommentDTO {
+  id: string
+  tool: string
+  author: UserDTO
+  body: string
+  comment_type: CommentType
+  parent: string | null
+  created_at: string
+  like_count: number
+  liked_by_me: boolean
+  reply_count?: number
+}
+
+function mapComment(d: CommentDTO): ToolComment {
+  return {
+    id: String(d.id),
+    toolId: String(d.tool),
+    author: d.author?.display_name || d.author?.username || '不明',
+    body: d.body,
+    commentType: d.comment_type,
+    parent: d.parent ? String(d.parent) : null,
+    createdAt: d.created_at,
+    likeCount: d.like_count ?? 0,
+    likedByMe: d.liked_by_me ?? false,
+  }
+}
+
+export async function listComments(toolId: string): Promise<ToolComment[]> {
+  return (await fetchAllPages<CommentDTO>(`/tools/${toolId}/comments/`)).map(mapComment)
+}
+
+export async function createComment(
+  toolId: string,
+  input: { body: string; commentType: CommentType; parent?: string | null },
+): Promise<ToolComment> {
+  const d = await apiFetch<CommentDTO>(`/tools/${toolId}/comments/`, {
+    method: 'POST',
+    body: JSON.stringify({
+      body: input.body,
+      comment_type: input.commentType,
+      parent: input.parent ?? null,
+    }),
+  })
+  return mapComment(d)
+}
+
+export async function deleteComment(commentId: string): Promise<void> {
+  await apiFetch<void>(`/comments/${commentId}/`, { method: 'DELETE' })
+}
+
+export async function toggleCommentLike(
+  commentId: string,
+): Promise<{ liked: boolean; likeCount: number }> {
+  const d = await apiFetch<{ liked: boolean; like_count: number }>(
+    `/comments/${commentId}/like/`,
+    { method: 'POST' },
+  )
+  return { liked: d.liked, likeCount: d.like_count }
 }
 
 export interface DashboardFunnelStage {

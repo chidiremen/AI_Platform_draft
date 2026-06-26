@@ -183,3 +183,66 @@ class Screenshot(models.Model):
 
     def __str__(self) -> str:
         return f"screenshot:{self.id}"
+
+
+class Comment(models.Model):
+    """A user comment on a Tool. Supports threaded replies via `parent`."""
+
+    class Kind(models.TextChoices):
+        BUG = "bug", "バグ報告"
+        FEATURE = "feature", "変更要望"
+        QUESTION = "question", "質問"
+        GENERAL = "general", "一般コメント"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tool = models.ForeignKey(
+        Tool, on_delete=models.CASCADE, related_name="comments"
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="comments",
+    )
+    body = models.TextField()
+    comment_type = models.CharField(
+        max_length=16, choices=Kind.choices, default=Kind.GENERAL
+    )
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="replies",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        verbose_name = "コメント"
+        verbose_name_plural = "コメント"
+
+    def __str__(self) -> str:
+        return f"comment:{self.id}"
+
+
+class CommentLike(models.Model):
+    """A "like" reaction on a comment (one per user per comment)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    comment = models.ForeignKey(
+        Comment, on_delete=models.CASCADE, related_name="likes"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="comment_likes",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("comment", "user")
+        verbose_name = "コメントいいね"
+        verbose_name_plural = "コメントいいね"
+
+    def __str__(self) -> str:
+        return f"{self.user_id} ♥ comment:{self.comment_id}"
