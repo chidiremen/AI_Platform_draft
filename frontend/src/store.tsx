@@ -399,7 +399,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
           t.id === tool.id ? { ...t, accessRequests: (t.accessRequests ?? 0) + 1 } : t,
         ),
       )
-      if (!USE_MOCK) void api.requestAccess(tool.id, reason)
+      if (!USE_MOCK) {
+        // 楽観追加した rec.id (フェイク `r${Date.now()}`) を、サーバ採番の
+        // 実 UUID に置き換える。これをやらないと後段の resolve が 404 になる。
+        api
+          .requestAccess(tool.id, reason)
+          .then((created) => {
+            setRequests((prev) =>
+              prev.map((r) => (r.id === rec.id ? { ...r, id: created.id } : r)),
+            )
+          })
+          .catch((e) => {
+            // 失敗時は楽観追加を取り消す
+            setRequests((prev) => prev.filter((r) => r.id !== rec.id))
+            setTools((ts) =>
+              ts.map((t) =>
+                t.id === tool.id
+                  ? { ...t, accessRequests: Math.max(0, (t.accessRequests ?? 1) - 1) }
+                  : t,
+              ),
+            )
+            toast(`⚠️ 申請の送信に失敗しました: ${e instanceof Error ? e.message : ''}`)
+          })
+      }
       toast('📬 アクセス権申請を送信しました（登録者へTeams通知）')
     },
     [currentUser, toast],

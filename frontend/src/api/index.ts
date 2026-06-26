@@ -396,11 +396,23 @@ export async function toggleLike(id: string): Promise<{ liked: boolean; likeCoun
   return { liked: d.liked, likeCount: d.like_count }
 }
 
-export async function requestAccess(id: string, reason: string): Promise<void> {
-  await apiFetch<unknown>(`/tools/${id}/request-access/`, {
-    method: 'POST',
-    body: JSON.stringify({ reason }),
-  })
+/**
+ * アクセス権申請を送信し、サーバが採番したレコードを返す。
+ * 楽観追加時の id (フェイク `r${Date.now()}`) を実IDで置き換えるために
+ * 戻り値を呼び出し側で利用する（404 resolve 防止）。
+ */
+export async function requestAccess(
+  id: string,
+  reason: string,
+): Promise<{ id: string; status: 'pending' | 'granted' | 'rejected' }> {
+  const d = await apiFetch<{ id: string; status: 'pending' | 'granted' | 'rejected' }>(
+    `/tools/${id}/request-access/`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    },
+  )
+  return { id: String(d.id), status: d.status }
 }
 
 // ── /api/me/* ──

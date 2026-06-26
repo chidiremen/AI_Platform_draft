@@ -58,7 +58,7 @@ export default function ToolDetailPage() {
 
       <div className="detail-grid">
         {/* ── メイン ── */}
-        <div>
+        <div className="detail-main">
           <h1 className="detail-title">{tool.title}</h1>
           <div className="detail-byline">
             by <strong>{tool.author}</strong> ・ {tool.createdAt} 登録
@@ -134,7 +134,7 @@ export default function ToolDetailPage() {
         </div>
 
         {/* ── サイドバー ── */}
-        <aside className="sidebar-sticky">
+        <aside className="sidebar-sticky detail-side">
           <div className="card-panel">
             <div className="metric-bar">
               <div className="metric-stat">

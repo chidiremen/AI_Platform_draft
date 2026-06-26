@@ -449,9 +449,20 @@ h3 {
   gap: 28px;
   align-items: start;
 }
-/* グリッド子要素が内容で膨らまないように（min-width:auto 対策） */
+/* グリッド子要素が内容で膨らまないように（min-width:auto 対策）。
+   `overflow: hidden` ではなく 0 だけにして sticky を阻害しない */
 .detail-grid > * {
   min-width: 0;
+  /* 万一の内容オーバーフローに対する保険（縦の sticky は阻害しない） */
+  max-width: 100%;
+}
+.detail-main {
+  min-width: 0;
+}
+.detail-side {
+  min-width: 0;
+  /* 念のため scroll 親が生成されないように */
+  overflow: visible;
 }
 .back-link {
   display: inline-flex;
