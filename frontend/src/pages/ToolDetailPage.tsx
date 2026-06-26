@@ -83,17 +83,28 @@ export default function ToolDetailPage() {
             </div>
           )}
 
+          {/* 概要（常に表示） */}
+          <div className="card-panel">
+            <h3 style={{ marginTop: 0 }}>概要</h3>
+            <p style={{ margin: 0, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+              {tool.summary || '（概要は未登録です）'}
+            </p>
+          </div>
+
+          {/* README（常に表示） */}
           <div className="card-panel" ref={readmeRef}>
+            <h3 style={{ marginTop: 0 }}>README</h3>
             <div className="markdown">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {tool.readme ?? '（READMEは未登録です）'}
+                {tool.readme && tool.readme.trim() ? tool.readme : '（READMEは未登録です）'}
               </ReactMarkdown>
             </div>
           </div>
 
-          {(tool.screenshots?.length ?? 0) > 0 ? (
-            <div className="card-panel">
-              <h3 style={{ marginTop: 0 }}>スクリーンショット</h3>
+          {/* スクリーンショット（常に表示。空ならプレースホルダ） */}
+          <div className="card-panel">
+            <h3 style={{ marginTop: 0 }}>スクリーンショット</h3>
+            {(tool.screenshots?.length ?? 0) > 0 ? (
               <div className="gallery">
                 {tool.screenshots!.map((s) => (
                   <a
@@ -108,29 +119,35 @@ export default function ToolDetailPage() {
                       backgroundPosition: 'center',
                     }}
                   >
-                    {/* 画像が読めない場合のフォールバック */}
                     <span style={{ opacity: 0 }}>📷</span>
                   </a>
                 ))}
               </div>
-            </div>
-          ) : null}
+            ) : (
+              <p className="section-empty">スクリーンショットは未登録です。</p>
+            )}
+          </div>
 
-          {(tool.effectQualitative || tool.effectHoursPerMonth) && (
-            <div className="card-panel">
-              <h3 style={{ marginTop: 0 }}>効果</h3>
-              {tool.effectQualitative && (
-                <p style={{ margin: '0 0 8px' }}>
-                  <strong>定性:</strong> {tool.effectQualitative}
-                </p>
-              )}
-              {tool.effectHoursPerMonth != null && (
-                <p style={{ margin: 0 }}>
-                  <strong>定量:</strong> 月間 {tool.effectHoursPerMonth} 時間 削減（自己申告）
-                </p>
-              )}
-            </div>
-          )}
+          {/* 効果（常に表示。空ならプレースホルダ） */}
+          <div className="card-panel">
+            <h3 style={{ marginTop: 0 }}>効果</h3>
+            {tool.effectQualitative || tool.effectHoursPerMonth != null ? (
+              <>
+                {tool.effectQualitative && (
+                  <p style={{ margin: '0 0 8px' }}>
+                    <strong>定性:</strong> {tool.effectQualitative}
+                  </p>
+                )}
+                {tool.effectHoursPerMonth != null && (
+                  <p style={{ margin: 0 }}>
+                    <strong>定量:</strong> 月間 {tool.effectHoursPerMonth} 時間 削減（自己申告）
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="section-empty">効果情報は未登録です。</p>
+            )}
+          </div>
         </div>
 
         {/* ── サイドバー ── */}

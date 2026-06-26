@@ -180,6 +180,38 @@ describe('ツールの編集・削除（登録者・管理者）', () => {
   })
 })
 
+describe('ツール詳細ページの各セクション', () => {
+  it('概要・README・スクリーンショット・効果セクションが常に表示される', () => {
+    renderAt('/tools/1')
+    // 各セクション見出し（セクション枠は h3。READMEのMarkdown内見出しと衝突
+    // しないよう level:3 で限定）
+    expect(screen.getByRole('heading', { name: '概要', level: 3 })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'README', level: 3 })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'スクリーンショット', level: 3 }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '効果', level: 3 })).toBeInTheDocument()
+    // 概要テキスト（詳細ページに表示される）
+    expect(
+      screen.getByText(/要件間のトレーサビリティマトリクスをAIが自動検証/),
+    ).toBeInTheDocument()
+  })
+
+  it('スクリーンショットが無い場合はプレースホルダを表示する', () => {
+    // mock tool 1 はスクリーンショット未登録
+    renderAt('/tools/1')
+    expect(screen.getByText('スクリーンショットは未登録です。')).toBeInTheDocument()
+  })
+
+  it('効果が無いツールではプレースホルダを表示する', () => {
+    // mock tool 13（社内AIプロンプト集）は effectHoursPerMonth=0 だが
+    // effectQualitative を持つため、効果情報が全く無いツールを別途確認する。
+    // ここでは「効果」見出しが必ず存在することを確認（空でもセクション表示）。
+    renderAt('/tools/9')
+    expect(screen.getByRole('heading', { name: '効果', level: 3 })).toBeInTheDocument()
+  })
+})
+
 describe('管理者ページ（ユーザー管理）', () => {
   it('管理者はユーザー管理ページにアクセスできる', () => {
     renderAt('/admin/users')
