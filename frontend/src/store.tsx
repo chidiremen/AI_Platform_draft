@@ -37,6 +37,8 @@ export interface NewToolInput {
   aspiceProcesses: string[]
   workCategories: string[]
   forkedFrom?: string
+  effectQualitative?: string
+  effectHoursPerMonth?: number | null
   /** zipファイル（ある場合 multipart 送信） */
   zipFile?: File | null
   /** 新規追加するスクリーンショット（複数） */
@@ -295,6 +297,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         tags: input.tags,
         accessUrl: input.accessUrl,
         forkedFrom: input.forkedFrom,
+        effectQualitative: input.effectQualitative || undefined,
+        effectHoursPerMonth: input.effectHoursPerMonth ?? undefined,
         author: currentUser?.name ?? '不明',
         createdAt: todayISO(),
         likes: 0,
@@ -331,6 +335,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 workCategories: input.workCategories,
                 tags: input.tags,
                 accessUrl: input.accessUrl,
+                effectQualitative: input.effectQualitative || undefined,
+                effectHoursPerMonth: input.effectHoursPerMonth ?? undefined,
                 updatedAt: todayISO(),
               }
             : t,

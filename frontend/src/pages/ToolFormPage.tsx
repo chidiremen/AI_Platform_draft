@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useApp } from '../store'
 import { TOOL_TYPES } from '../data/toolTypes'
@@ -17,7 +17,6 @@ export default function ToolFormPage() {
   const forkId = params.get('fork')
   const mode: Mode = editId ? 'edit' : forkId ? 'fork' : 'new'
 
-  // 編集 or フォーク元のツール
   const source = useMemo(
     () => tools.find((t) => t.id === (editId ?? forkId ?? '')),
     [editId, forkId, tools],
@@ -35,11 +34,20 @@ export default function ToolFormPage() {
   const [work, setWork] = useState<Set<WorkCategoryId>>(
     new Set((source?.workCategories ?? []) as WorkCategoryId[]),
   )
+
+  // 効果
+  const [effectQualitative, setEffectQualitative] = useState(source?.effectQualitative ?? '')
+  const [effectHours, setEffectHours] = useState(
+    source?.effectHoursPerMonth != null ? String(source.effectHoursPerMonth) : '',
+  )
+
   // ファイル入力
   const [zipFile, setZipFile] = useState<File | null>(null)
   const [screenshots, setScreenshots] = useState<File[]>([])
+  const [screenshotPreviews, setScreenshotPreviews] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const screenshotDropRef = useRef<HTMLDivElement>(null)
 
   // 編集モードで対象が無い / 権限が無い場合はリダイレクト
   if (mode === 'edit') {
@@ -62,6 +70,53 @@ export default function ToolFormPage() {
     })
   }
 
+  const addScreenshotFiles = useCallback((files: File[]) => {
+    const imageFiles = files.filter((f) => f.type.startsWith('image/'))
+    if (imageFiles.length === 0) return
+    setScreenshots((prev) => [...prev, ...imageFiles])
+    for (const file of imageFiles) {
+      const url = URL.createObjectURL(file)
+      setScreenshotPreviews((prev) => [...prev, url])
+    }
+  }, [])
+
+  const removeScreenshot = useCallback((index: number) => {
+    setScreenshots((prev) => prev.filter((_, i) => i !== index))
+    setScreenshotPreviews((prev) => {
+      URL.revokeObjectURL(prev[index])
+      return prev.filter((_, i) => i !== index)
+    })
+  }, [])
+
+  // クリップボード貼り付け（Ctrl+V）
+  useEffect(() => {
+    function handlePaste(e: ClipboardEvent) {
+      const items = e.clipboardData?.items
+      if (!items) return
+      const imageFiles: File[] = []
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile()
+          if (file) imageFiles.push(file)
+        }
+      }
+      if (imageFiles.length > 0) {
+        e.preventDefault()
+        addScreenshotFiles(imageFiles)
+      }
+    }
+    document.addEventListener('paste', handlePaste)
+    return () => document.removeEventListener('paste', handlePaste)
+  }, [addScreenshotFiles])
+
+  // プレビューURL のクリーンアップ
+  useEffect(() => {
+    return () => {
+      screenshotPreviews.forEach((url) => URL.revokeObjectURL(url))
+    }
+  }, [])
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitError('')
@@ -69,6 +124,7 @@ export default function ToolFormPage() {
       setSubmitError('zip種別の場合は zip ファイルを添付してください')
       return
     }
+    const parsedHours = effectHours.trim() ? parseFloat(effectHours) : null
     const input = {
       title,
       summary,
@@ -82,6 +138,8 @@ export default function ToolFormPage() {
       aspiceProcesses: [...aspice],
       workCategories: [...work],
       forkedFrom: mode === 'fork' ? source?.id : undefined,
+      effectQualitative: effectQualitative || undefined,
+      effectHoursPerMonth: parsedHours != null && !isNaN(parsedHours) ? parsedHours : null,
       zipFile,
       newScreenshots: screenshots,
     }
@@ -205,21 +263,49 @@ export default function ToolFormPage() {
           </div>
         )}
 
+        {/* スクリーンショット（ファイル選択 + クリップボード貼り付け） */}
         <div style={{ marginBottom: 18 }}>
-          <label className="label">スクリーンショット（複数選択可・任意）</label>
+          <label className="label">スクリーンショット（複数選択可・Ctrl+V で貼り付け可・任意）</label>
           <input
             className="input"
             type="file"
             accept="image/*"
             multiple
-            onChange={(e) => setScreenshots(Array.from(e.target.files ?? []))}
+            onChange={(e) => addScreenshotFiles(Array.from(e.target.files ?? []))}
           />
-          {screenshots.length > 0 && (
-            <div style={{ fontSize: 12, color: 'var(--accent-bright)', marginTop: 4 }}>
-              {screenshots.length} 枚を追加します
-              （{screenshots.map((f) => f.name).join(', ')}）
+          <div
+            ref={screenshotDropRef}
+            className="screenshot-drop-zone"
+            onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('drag-over') }}
+            onDragLeave={(e) => e.currentTarget.classList.remove('drag-over')}
+            onDrop={(e) => {
+              e.preventDefault()
+              e.currentTarget.classList.remove('drag-over')
+              addScreenshotFiles(Array.from(e.dataTransfer.files))
+            }}
+          >
+            📋 Ctrl+V でクリップボードから画像を貼り付け、またはここにドラッグ＆ドロップ
+          </div>
+
+          {screenshotPreviews.length > 0 && (
+            <div className="screenshot-preview-grid">
+              {screenshotPreviews.map((url, i) => (
+                <div key={url} className="screenshot-preview-item">
+                  <img src={url} alt={`スクリーンショット ${i + 1}`} />
+                  <button
+                    type="button"
+                    className="screenshot-preview-remove"
+                    onClick={() => removeScreenshot(i)}
+                    title="削除"
+                  >
+                    ✕
+                  </button>
+                  <div className="screenshot-preview-label">{screenshots[i]?.name || `貼り付け ${i + 1}`}</div>
+                </div>
+              ))}
             </div>
           )}
+
           {mode === 'edit' && (source?.screenshots?.length ?? 0) > 0 && (
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
               既存 {source?.screenshots?.length} 枚は保持されます
@@ -299,6 +385,39 @@ export default function ToolFormPage() {
             placeholder="## 概要&#10;使い方・セットアップ手順をMarkdownで記述"
           />
         </div>
+
+        {/* 効果セクション */}
+        <fieldset className="effect-fieldset">
+          <legend className="label">効果（任意）</legend>
+          <div style={{ marginBottom: 14 }}>
+            <label className="label-sub">定性効果</label>
+            <input
+              className="input"
+              value={effectQualitative}
+              onChange={(e) => setEffectQualitative(e.target.value)}
+              placeholder="例: 要件レビューの抜け漏れチェック工数が半減した"
+            />
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
+              ツールの導入効果を自由記述してください
+            </div>
+          </div>
+          <div>
+            <label className="label-sub">定量効果: 月間削減時間（時間/月）</label>
+            <input
+              className="input"
+              type="number"
+              min="0"
+              step="0.5"
+              value={effectHours}
+              onChange={(e) => setEffectHours(e.target.value)}
+              placeholder="例: 20"
+              style={{ maxWidth: 200 }}
+            />
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
+              自己申告ベース。月間の時間削減量を入力してください
+            </div>
+          </div>
+        </fieldset>
 
         <div style={{ marginBottom: 24 }}>
           <label className="label">タグ（カンマ区切り）</label>

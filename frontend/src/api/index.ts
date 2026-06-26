@@ -218,9 +218,9 @@ function toWritePayload(input: NewToolInput) {
     tags: input.tags.join(', '),
     work_categories: input.workCategories,
     aspice_process_ids: input.aspiceProcesses,
+    effect_qualitative: input.effectQualitative ?? '',
+    effect_hours_per_month: input.effectHoursPerMonth ?? null,
   }
-  // forked_from は「フォーク作成時」だけ送る。編集(PATCH)では送らないことで、
-  // 既存のフォーク元リンクを誤って null 上書きしないようにする。
   if (input.forkedFrom !== undefined) {
     payload.forked_from = input.forkedFrom
   }
@@ -239,6 +239,10 @@ function toMultipartPayload(input: NewToolInput): FormData {
   // JSONField はサーバ側で CSV/JSON文字列を許容（_coerce_string_list）
   fd.append('work_categories', input.workCategories.join(','))
   fd.append('aspice_process_ids', input.aspiceProcesses.join(','))
+  fd.append('effect_qualitative', input.effectQualitative ?? '')
+  if (input.effectHoursPerMonth != null) {
+    fd.append('effect_hours_per_month', String(input.effectHoursPerMonth))
+  }
   if (input.forkedFrom !== undefined) {
     fd.append('forked_from', input.forkedFrom)
   }

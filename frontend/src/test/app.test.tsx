@@ -178,6 +178,27 @@ describe('ツールの編集・削除（登録者・管理者）', () => {
       screen.getByDisplayValue('A-SPICE要件トレーサビリティチェッカー'),
     ).toBeInTheDocument()
   })
+
+  it('編集画面で効果フィールドがプリフィルされる', () => {
+    renderAt('/tools/1/edit')
+    expect(
+      screen.getByDisplayValue('要件レビューの抜け漏れチェック工数が半減した'),
+    ).toBeInTheDocument()
+    expect(screen.getByDisplayValue('20')).toBeInTheDocument()
+  })
+})
+
+describe('ツール登録ページの効果入力', () => {
+  it('効果フィールド（定性・定量）が表示される', () => {
+    renderAt('/tools/new')
+    expect(screen.getByPlaceholderText(/要件レビューの抜け漏れ/)).toBeInTheDocument()
+    expect(screen.getByText(/月間削減時間/)).toBeInTheDocument()
+  })
+
+  it('スクリーンショット貼り付けエリアが表示される', () => {
+    renderAt('/tools/new')
+    expect(screen.getByText(/Ctrl\+V でクリップボードから画像を貼り付け/)).toBeInTheDocument()
+  })
 })
 
 describe('ツール詳細ページの各セクション', () => {
