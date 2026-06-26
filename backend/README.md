@@ -19,7 +19,8 @@ access-request actions, activity logging, and role-based dashboards.
 cd backend
 
 # 1. Create and activate a virtualenv
-python3 -m venv venv
+#    (環境により python / python3 のどちらか。以降は `python` で記載)
+python -m venv venv               # または: python3 -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
 
 # 2. Install dependencies
@@ -35,6 +36,7 @@ python manage.py migrate
 python manage.py seed_data
 
 # 6. Create a Django admin superuser (optional; or use seeded `admin`)
+#    createsuperuser で作成したユーザーは自動的に role=admin（組織管理者）として扱われます。
 python manage.py createsuperuser
 
 # 7. Run the dev server

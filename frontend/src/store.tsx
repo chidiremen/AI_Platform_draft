@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import type { ReactNode } from 'react'
@@ -36,6 +37,10 @@ export interface NewToolInput {
   aspiceProcesses: string[]
   workCategories: string[]
   forkedFrom?: string
+  /** zipファイル（ある場合 multipart 送信） */
+  zipFile?: File | null
+  /** 新規追加するスクリーンショット（複数） */
+  newScreenshots?: File[]
 }
 
 interface AppState {
@@ -60,7 +65,12 @@ interface AppState {
   requests: AccessRequestRecord[]
   toggleLike: (toolId: string) => void
   submitRequest: (tool: Tool, reason: string) => void
-  recordDownload: (toolId: string) => void
+  /** zipダウンロード（モック=カウント増、API=実ダウンロード+カウント） */
+  recordDownload: (tool: Tool) => void
+  /** ファネル計測（impression/view/readme_scroll）。セッション内で重複排除。 */
+  recordActivity: (toolId: string, action: 'impression' | 'view' | 'readme_scroll') => void
+  /** 申請の承認/却下（登録者本人または管理者）。 */
+  resolveRequest: (requestId: string, status: 'granted' | 'rejected') => Promise<void>
   // 権限ヘルパ
   canEdit: (tool: Tool) => boolean
   toast: (msg: string) => void
@@ -93,6 +103,18 @@ const SEED_REQUESTS: AccessRequestRecord[] = [
     status: 'granted',
     createdAt: '2026-06-05',
   },
+  // tool 1 (田中太郎 = 管理者) への保留中の申請。マイページ「被申請一覧」で
+  // 承認/却下フローを動かすために初期投入する。
+  {
+    id: 'r1',
+    toolId: '1',
+    toolTitle: 'A-SPICE要件トレーサビリティチェッカー',
+    requester: '鈴木花子',
+    author: '田中太郎',
+    reason: '要件レビュー会の準備に使いたい',
+    status: 'pending',
+    createdAt: '2026-06-12',
+  },
 ]
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -107,6 +129,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   )
   const [toastMsg, setToastMsg] = useState<string | null>(null)
   const [loading, setLoading] = useState<boolean>(!USE_MOCK)
+  // ファネル計測の重複排除（action:toolId をセッション内で一度だけ計上）
+  const activitySeen = useRef<Set<string>>(new Set())
 
   const toast = useCallback((msg: string) => {
     setToastMsg(msg)
@@ -382,14 +406,63 @@ export function AppProvider({ children }: { children: ReactNode }) {
   )
 
   const recordDownload = useCallback(
-    (toolId: string) => {
+    (tool: Tool) => {
       setTools((ts) =>
-        ts.map((t) => (t.id === toolId ? { ...t, downloads: (t.downloads ?? 0) + 1 } : t)),
+        ts.map((t) => (t.id === tool.id ? { ...t, downloads: (t.downloads ?? 0) + 1 } : t)),
       )
-      if (!USE_MOCK) void api.postActivity([{ tool: toolId, action: 'download' }])
-      toast('📥 ダウンロードを開始しました（デモ）')
+      if (!USE_MOCK) {
+        const filename = tool.zipFileName || `${tool.title}.zip`
+        api
+          .downloadZip(tool.id, filename)
+          .then(() => api.postActivity([{ tool: tool.id, action: 'download' }]))
+          .catch((e) =>
+            toast(`📥 ダウンロードに失敗しました: ${e instanceof Error ? e.message : ''}`),
+          )
+      } else {
+        toast('📥 ダウンロードを開始しました（デモ）')
+      }
     },
     [toast],
+  )
+
+  // ── アクセス権申請の承認/却下 ──
+  const resolveRequest = useCallback(
+    async (requestId: string, status: 'granted' | 'rejected') => {
+      try {
+        if (!USE_MOCK) await api.resolveAccessRequest(requestId, status)
+        setRequests((prev) =>
+          prev.map((r) => (r.id === requestId ? { ...r, status } : r)),
+        )
+        toast(status === 'granted' ? '✅ 申請を承認しました' : '🚫 申請を却下しました')
+      } catch (e) {
+        // API失敗時に無反応（ボタンが効かないように見える）にならないよう通知する
+        toast(`⚠️ 処理に失敗しました: ${e instanceof Error ? e.message : ''}`)
+      }
+    },
+    [toast],
+  )
+
+  // ── ファネル計測（impression / view / readme_scroll）──
+  const recordActivity = useCallback(
+    (toolId: string, action: 'impression' | 'view' | 'readme_scroll') => {
+      const key = `${action}:${toolId}`
+      if (activitySeen.current.has(key)) return // セッション内で重複排除
+      activitySeen.current.add(key)
+      // 閲覧・インプレッションはローカルカウントも楽観更新（一覧/詳細を「ライブ」に）
+      if (action === 'view' || action === 'impression') {
+        setTools((ts) =>
+          ts.map((t) =>
+            t.id === toolId
+              ? action === 'view'
+                ? { ...t, views: t.views + 1 }
+                : { ...t, impressions: t.impressions + 1 }
+              : t,
+          ),
+        )
+      }
+      if (!USE_MOCK) void api.postActivity([{ tool: toolId, action }])
+    },
+    [],
   )
 
   const value = useMemo<AppState>(
@@ -411,6 +484,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toggleLike,
       submitRequest,
       recordDownload,
+      recordActivity,
+      resolveRequest,
       canEdit,
       toast,
     }),
@@ -431,6 +506,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toggleLike,
       submitRequest,
       recordDownload,
+      recordActivity,
+      resolveRequest,
       canEdit,
       toast,
     ],

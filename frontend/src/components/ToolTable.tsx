@@ -4,6 +4,7 @@ import type { SortKey, Tool } from '../types'
 import { AspiceBadge, ToolTypeBadge, WorkCategoryBadge } from './Badges'
 import { TOOL_TYPE_MAP } from '../data/toolTypes'
 import { useApp } from '../store'
+import { useImpression } from '../hooks/useActivity'
 import RequestModal from './RequestModal'
 
 export type ColumnKey =
@@ -43,6 +44,105 @@ export const TOGGLEABLE_COLUMNS: ColumnDef[] = [
   { key: 'newest', label: '登録日', sortKey: 'newest', width: '110px' },
 ]
 
+function renderBodyCell(col: ColumnDef, tool: Tool) {
+  switch (col.key) {
+    case 'type':
+      return (
+        <td key={col.key}>
+          <ToolTypeBadge type={tool.toolType} />
+        </td>
+      )
+    case 'work':
+      return (
+        <td key={col.key}>
+          <div className="table-badges">
+            {(tool.workCategories ?? []).length > 0 ? (
+              (tool.workCategories ?? []).map((id) => <WorkCategoryBadge key={id} id={id} />)
+            ) : (
+              <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>—</span>
+            )}
+          </div>
+        </td>
+      )
+    case 'aspice':
+      return (
+        <td key={col.key}>
+          <div className="table-badges">
+            {tool.aspiceProcesses.length > 0 ? (
+              tool.aspiceProcesses.map((id) => <AspiceBadge key={id} id={id} />)
+            ) : (
+              <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>—</span>
+            )}
+          </div>
+        </td>
+      )
+    case 'likes':
+      return <td key={col.key} className="num-cell">{tool.likes}</td>
+    case 'views':
+      return <td key={col.key} className="num-cell">{tool.views}</td>
+    case 'requests':
+      return <td key={col.key} className="num-cell">{tool.accessRequests ?? 0}</td>
+    case 'downloads':
+      return <td key={col.key} className="num-cell">{tool.downloads ?? '—'}</td>
+    case 'newest':
+      return <td key={col.key} className="date-cell">{tool.createdAt}</td>
+    default:
+      return null
+  }
+}
+
+interface RowProps {
+  tool: Tool
+  cols: ColumnDef[]
+  liked: boolean
+  onToggleLike: (id: string) => void
+  onDownload: (tool: Tool) => void
+  onRequest: (tool: Tool) => void
+}
+
+function ToolTableRow({ tool, cols, liked, onToggleLike, onDownload, onRequest }: RowProps) {
+  const isZip = TOOL_TYPE_MAP[tool.toolType].action === 'download'
+  const ref = useImpression<HTMLTableRowElement>(tool.id)
+  return (
+    <tr ref={ref}>
+      <td>
+        <Link to={`/tools/${tool.id}`} className="table-tool-name">
+          {tool.title}
+        </Link>
+        <div className="table-tool-summary">{tool.summary}</div>
+      </td>
+
+      {cols.map((col) => renderBodyCell(col, tool))}
+
+      <td>
+        <div className="table-actions">
+          <button
+            className={`btn-icon ${liked ? 'liked' : ''}`}
+            onClick={() => onToggleLike(tool.id)}
+            title={liked ? 'いいね解除' : 'いいね'}
+          >
+            {liked ? '♥' : '♡'}
+          </button>
+
+          {isZip ? (
+            <button className="btn-sm btn-primary" onClick={() => onDownload(tool)}>
+              📥 DL
+            </button>
+          ) : (
+            <button className="btn-sm btn-primary" onClick={() => onRequest(tool)}>
+              📨 申請
+            </button>
+          )}
+
+          <Link to={`/tools/${tool.id}`} className="btn-sm btn-ghost">
+            📄 詳細
+          </Link>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
 export default function ToolTable({ tools, sort, onSort, visibleColumns }: Props) {
   const { likedIds, toggleLike, submitRequest, recordDownload } = useApp()
   const [modalTool, setModalTool] = useState<Tool | null>(null)
@@ -65,53 +165,6 @@ export default function ToolTable({ tools, sort, onSort, visibleColumns }: Props
     )
   }
 
-  function renderBodyCell(col: ColumnDef, tool: Tool) {
-    switch (col.key) {
-      case 'type':
-        return (
-          <td key={col.key}>
-            <ToolTypeBadge type={tool.toolType} />
-          </td>
-        )
-      case 'work':
-        return (
-          <td key={col.key}>
-            <div className="table-badges">
-              {(tool.workCategories ?? []).length > 0 ? (
-                (tool.workCategories ?? []).map((id) => <WorkCategoryBadge key={id} id={id} />)
-              ) : (
-                <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>—</span>
-              )}
-            </div>
-          </td>
-        )
-      case 'aspice':
-        return (
-          <td key={col.key}>
-            <div className="table-badges">
-              {tool.aspiceProcesses.length > 0 ? (
-                tool.aspiceProcesses.map((id) => <AspiceBadge key={id} id={id} />)
-              ) : (
-                <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>—</span>
-              )}
-            </div>
-          </td>
-        )
-      case 'likes':
-        return <td key={col.key} className="num-cell">{tool.likes}</td>
-      case 'views':
-        return <td key={col.key} className="num-cell">{tool.views}</td>
-      case 'requests':
-        return <td key={col.key} className="num-cell">{tool.accessRequests ?? 0}</td>
-      case 'downloads':
-        return <td key={col.key} className="num-cell">{tool.downloads ?? '—'}</td>
-      case 'newest':
-        return <td key={col.key} className="date-cell">{tool.createdAt}</td>
-      default:
-        return null
-    }
-  }
-
   return (
     <>
       <div className="table-scroll">
@@ -130,52 +183,17 @@ export default function ToolTable({ tools, sort, onSort, visibleColumns }: Props
             </tr>
           </thead>
           <tbody>
-            {tools.map((tool) => {
-              const typeInfo = TOOL_TYPE_MAP[tool.toolType]
-              const isZip = typeInfo.action === 'download'
-              const liked = likedIds.has(tool.id)
-              return (
-                <tr key={tool.id}>
-                  <td>
-                    <Link to={`/tools/${tool.id}`} className="table-tool-name">
-                      {tool.title}
-                    </Link>
-                    <div className="table-tool-summary">{tool.summary}</div>
-                  </td>
-
-                  {cols.map((col) => renderBodyCell(col, tool))}
-
-                  <td>
-                    <div className="table-actions">
-                      <button
-                        className={`btn-icon ${liked ? 'liked' : ''}`}
-                        onClick={() => toggleLike(tool.id)}
-                        title={liked ? 'いいね解除' : 'いいね'}
-                      >
-                        {liked ? '♥' : '♡'}
-                      </button>
-
-                      {isZip ? (
-                        <button
-                          className="btn-sm btn-primary"
-                          onClick={() => recordDownload(tool.id)}
-                        >
-                          📥 DL
-                        </button>
-                      ) : (
-                        <button className="btn-sm btn-primary" onClick={() => setModalTool(tool)}>
-                          📨 申請
-                        </button>
-                      )}
-
-                      <Link to={`/tools/${tool.id}`} className="btn-sm btn-ghost">
-                        📄 詳細
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
+            {tools.map((tool) => (
+              <ToolTableRow
+                key={tool.id}
+                tool={tool}
+                cols={cols}
+                liked={likedIds.has(tool.id)}
+                onToggleLike={toggleLike}
+                onDownload={recordDownload}
+                onRequest={setModalTool}
+              />
+            ))}
           </tbody>
         </table>
       </div>

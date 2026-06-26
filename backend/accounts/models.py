@@ -27,8 +27,13 @@ class User(AbstractUser):
         return self.role == self.Role.ADMIN
 
     def save(self, *args, **kwargs):
-        # Keep Django admin flags aligned with the application role, while
-        # leaving ``role`` as the authoritative source for app permissions.
+        # Keep the application role and Django admin flags consistent in both
+        # directions:
+        #   - A Django superuser (e.g. created via ``createsuperuser``) is
+        #     always treated as an application admin.
+        #   - An admin-role user gets the Django admin flags as a convenience.
+        if self.is_superuser:
+            self.role = self.Role.ADMIN
         if self.role == self.Role.ADMIN:
             self.is_staff = True
             self.is_superuser = True

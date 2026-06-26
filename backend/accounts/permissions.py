@@ -7,7 +7,7 @@ def is_admin(user) -> bool:
     return bool(
         user
         and user.is_authenticated
-        and getattr(user, "role", None) == "admin"
+        and (getattr(user, "role", None) == "admin" or user.is_superuser)
     )
 
 

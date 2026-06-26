@@ -104,6 +104,15 @@ describe('ツール一覧（HomePage）', () => {
   })
 })
 
+describe('ファネル計測（活動ログ）', () => {
+  it('詳細ページを開くと閲覧数が1回だけ加算される', () => {
+    // tool 1 の初期 views は 456 → 詳細表示で 457（重複排除で +1 のみ）
+    renderAt('/tools/1')
+    expect(screen.getByText('457')).toBeInTheDocument()
+    expect(screen.queryByText('456')).not.toBeInTheDocument()
+  })
+})
+
 describe('列の表示/非表示', () => {
   it('「いいね」列を非表示にするとテーブルヘッダから消える', () => {
     renderAt('/')
@@ -224,5 +233,19 @@ describe('マイページ', () => {
     expect(
       screen.getByText('A-SPICE要件トレーサビリティチェッカー'),
     ).toBeInTheDocument()
+  })
+
+  it('被申請一覧の pending を承認すると承認済みに変わる', () => {
+    renderAt('/mypage')
+    fireEvent.click(
+      screen.getByRole('button', { name: /自分のツールへの被申請/ }),
+    )
+    // SEED_REQUESTS の r1: 鈴木花子 → tool1（田中太郎）
+    expect(screen.getByText('鈴木花子')).toBeInTheDocument()
+    expect(screen.getByText('申請中')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /承認/ }))
+    expect(screen.queryByText('申請中')).not.toBeInTheDocument()
+    // 既存の granted（r0）と合わせて2件表示される
+    expect(screen.getAllByText('承認済み').length).toBeGreaterThanOrEqual(1)
   })
 })

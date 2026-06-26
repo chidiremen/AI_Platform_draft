@@ -12,7 +12,7 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export default function MyPage() {
-  const { tools, likedIds, requests, currentUser } = useApp()
+  const { tools, likedIds, requests, currentUser, resolveRequest } = useApp()
   const [tab, setTab] = useState<Tab>('mine')
 
   const myName = currentUser?.name ?? ''
@@ -74,6 +74,7 @@ export default function MyPage() {
 
       {tab === 'requests' &&
         (myRequests.length ? (
+          <div className="table-scroll">
           <table className="data-table">
             <thead>
               <tr>
@@ -100,12 +101,14 @@ export default function MyPage() {
               ))}
             </tbody>
           </table>
+          </div>
         ) : (
           <div className="empty">アクセス権の申請はまだありません。</div>
         ))}
 
       {tab === 'incoming' &&
         (incoming.length ? (
+          <div className="table-scroll">
           <table className="data-table">
             <thead>
               <tr>
@@ -114,6 +117,7 @@ export default function MyPage() {
                 <th>申請理由</th>
                 <th>申請日</th>
                 <th>状態</th>
+                <th>処理</th>
               </tr>
             </thead>
             <tbody>
@@ -130,10 +134,31 @@ export default function MyPage() {
                       {STATUS_LABEL[r.status]}
                     </span>
                   </td>
+                  <td>
+                    {r.status === 'pending' ? (
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          className="btn-sm btn-primary"
+                          onClick={() => resolveRequest(r.id, 'granted')}
+                        >
+                          ✅ 承認
+                        </button>
+                        <button
+                          className="btn-sm"
+                          onClick={() => resolveRequest(r.id, 'rejected')}
+                        >
+                          🚫 却下
+                        </button>
+                      </div>
+                    ) : (
+                      <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>処理済</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         ) : (
           <div className="empty">自分のツールへの申請はまだありません。</div>
         ))}

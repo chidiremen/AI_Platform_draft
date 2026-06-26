@@ -2,11 +2,13 @@ import { Link } from 'react-router-dom'
 import type { Tool } from '../types'
 import { AspiceBadge, ToolTypeBadge, WorkCategoryBadge } from './Badges'
 import { TOOL_TYPE_MAP } from '../data/toolTypes'
+import { useImpression } from '../hooks/useActivity'
 
 export default function ToolCard({ tool }: { tool: Tool }) {
   const isZip = TOOL_TYPE_MAP[tool.toolType].action === 'download'
+  const ref = useImpression<HTMLAnchorElement>(tool.id)
   return (
-    <Link to={`/tools/${tool.id}`} className="tool-card">
+    <Link ref={ref} to={`/tools/${tool.id}`} className="tool-card">
       <div className="tool-card-head">
         <h3 className="tool-card-title">{tool.title}</h3>
       </div>

@@ -143,9 +143,12 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Django REST Framework
 # --------------------------------------------------------------------------- #
 REST_FRAMEWORK = {
+    # Token first: a token-bearing SPA request authenticates via the token
+    # and never triggers SessionAuthentication's CSRF enforcement. Session
+    # auth is kept (after token) for the browsable API / Django admin.
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
     ],
     # Reads are public by default; write/admin views override per-view.
     "DEFAULT_PERMISSION_CLASSES": [
@@ -153,6 +156,11 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 12,
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
+        "rest_framework.parsers.MultiPartParser",
+        "rest_framework.parsers.FormParser",
+    ],
 }
 
 # --------------------------------------------------------------------------- #

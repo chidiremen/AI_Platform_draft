@@ -35,6 +35,11 @@ export default function ToolFormPage() {
   const [work, setWork] = useState<Set<WorkCategoryId>>(
     new Set((source?.workCategories ?? []) as WorkCategoryId[]),
   )
+  // ファイル入力
+  const [zipFile, setZipFile] = useState<File | null>(null)
+  const [screenshots, setScreenshots] = useState<File[]>([])
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   // 編集モードで対象が無い / 権限が無い場合はリダイレクト
   if (mode === 'edit') {
@@ -59,6 +64,11 @@ export default function ToolFormPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setSubmitError('')
+    if (toolType === 'zip_upload' && mode !== 'edit' && !zipFile) {
+      setSubmitError('zip種別の場合は zip ファイルを添付してください')
+      return
+    }
     const input = {
       title,
       summary,
@@ -72,8 +82,11 @@ export default function ToolFormPage() {
       aspiceProcesses: [...aspice],
       workCategories: [...work],
       forkedFrom: mode === 'fork' ? source?.id : undefined,
+      zipFile,
+      newScreenshots: screenshots,
     }
 
+    setSubmitting(true)
     try {
       if (mode === 'edit' && source) {
         await updateTool(source.id, input)
@@ -82,8 +95,12 @@ export default function ToolFormPage() {
         const newId = await addTool(input)
         navigate(`/tools/${newId}`)
       }
-    } catch {
-      /* エラー時はトースト等で通知（API失敗）。フォームは保持。 */
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : '登録に失敗しました（サーバ応答エラー）',
+      )
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -166,10 +183,50 @@ export default function ToolFormPage() {
 
         {needsZip && (
           <div style={{ marginBottom: 18 }}>
-            <label className="label">添付ファイル *（zip形式）</label>
-            <input className="input" type="file" accept=".zip" />
+            <label className="label">
+              添付ファイル{mode === 'edit' ? '（差し替え時のみ）' : ' *'}（zip形式）
+            </label>
+            <input
+              className="input"
+              type="file"
+              accept=".zip,application/zip,application/x-zip-compressed"
+              onChange={(e) => setZipFile(e.target.files?.[0] ?? null)}
+            />
+            {source?.zipFileName && (
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
+                現在のファイル: {source.zipFileName}
+              </div>
+            )}
+            {zipFile && (
+              <div style={{ fontSize: 12, color: 'var(--accent-bright)', marginTop: 4 }}>
+                選択中: {zipFile.name}（{Math.ceil(zipFile.size / 1024)} KB）
+              </div>
+            )}
           </div>
         )}
+
+        <div style={{ marginBottom: 18 }}>
+          <label className="label">スクリーンショット（複数選択可・任意）</label>
+          <input
+            className="input"
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={(e) => setScreenshots(Array.from(e.target.files ?? []))}
+          />
+          {screenshots.length > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--accent-bright)', marginTop: 4 }}>
+              {screenshots.length} 枚を追加します
+              （{screenshots.map((f) => f.name).join(', ')}）
+            </div>
+          )}
+          {mode === 'edit' && (source?.screenshots?.length ?? 0) > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
+              既存 {source?.screenshots?.length} 枚は保持されます
+              （新規選択分は追加投稿されます）
+            </div>
+          )}
+        </div>
 
         <div style={{ marginBottom: 18 }}>
           <label className="label">業務シーン（複数選択可・{work.size} 件選択中）</label>
@@ -253,6 +310,8 @@ export default function ToolFormPage() {
           />
         </div>
 
+        {submitError && <div className="login-error">{submitError}</div>}
+
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
           <button type="button" className="btn btn-ghost" onClick={() => navigate(-1)}>
             キャンセル
@@ -260,14 +319,14 @@ export default function ToolFormPage() {
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={aspice.size === 0 && work.size === 0}
+            disabled={submitting || (aspice.size === 0 && work.size === 0)}
             title={
               aspice.size === 0 && work.size === 0
                 ? '業務シーンまたはA-SPICEプロセスを少なくとも1つ選択してください'
                 : undefined
             }
           >
-            {submitLabel}
+            {submitting ? '送信中…' : submitLabel}
           </button>
         </div>
       </form>

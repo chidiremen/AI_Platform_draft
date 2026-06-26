@@ -87,6 +87,7 @@ export default function AdminUsersPage() {
         {/* ── ユーザー一覧 ── */}
         <div className="card-panel">
           <h3 style={{ marginTop: 0 }}>登録ユーザー一覧（{users.length}名）</h3>
+          <div className="table-scroll">
           <table className="data-table">
             <thead>
               <tr>
@@ -122,6 +123,7 @@ export default function AdminUsersPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>

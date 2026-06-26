@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Bar,
@@ -18,9 +18,12 @@ import {
   YAxis,
 } from 'recharts'
 import { useApp } from '../store'
+import * as api from '../api'
 import { ASPICE_PROCESSES, CATEGORY_COLORS } from '../data/aspice'
 import { TOOL_TYPES, TOOL_TYPE_MAP } from '../data/toolTypes'
 import { WORK_CATEGORIES } from '../data/workCategories'
+
+const FUNNEL_PALETTE = ['#3a8dde', '#41c7b9', '#b88ad6', '#e0a458', '#e07a8b']
 
 const CHART_AXIS = '#6b7d99'
 const GRID = '#1d3556'
@@ -34,7 +37,7 @@ const tooltipStyle = {
 }
 
 export default function DashboardPage() {
-  const { tools: allTools, currentUser } = useApp()
+  const { tools: allTools, currentUser, mode } = useApp()
   const isAdmin = currentUser?.role === 'admin'
 
   // 権限によるスコープ：管理者は全ツール、メンバーは自分が登録したツールのみ
@@ -43,7 +46,33 @@ export default function DashboardPage() {
     [allTools, isAdmin, currentUser],
   )
 
-  const totals = useMemo(() => {
+  // 実APIモード: 閲覧/インプレッション/ファネルはバックエンドの集計(ActivityLog)を使う。
+  // （一覧シリアライザに含まれないため、クライアント集計では0になる）
+  const [apiSummary, setApiSummary] = useState<api.DashboardSummary | null>(null)
+  const [apiFunnel, setApiFunnel] = useState<api.DashboardFunnelStage[] | null>(null)
+
+  useEffect(() => {
+    if (mode !== 'api') return
+    let active = true
+    ;(async () => {
+      try {
+        const [summary, funnel] = await Promise.all([
+          api.dashboardSummary(),
+          api.dashboardFunnel(),
+        ])
+        if (!active) return
+        setApiSummary(summary)
+        setApiFunnel(funnel.funnel)
+      } catch {
+        /* 取得失敗時はクライアント集計にフォールバック */
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [mode, currentUser])
+
+  const clientTotals = useMemo(() => {
     const impressions = tools.reduce((s, t) => s + t.impressions, 0)
     const views = tools.reduce((s, t) => s + t.views, 0)
     const requests = tools.reduce((s, t) => s + (t.accessRequests ?? 0), 0)
@@ -52,18 +81,32 @@ export default function DashboardPage() {
     return { impressions, views, requests, downloads, hours }
   }, [tools])
 
-  const funnelData = useMemo(
-    () => [
+  // 実APIモードかつ集計取得済みならバックエンド集計を優先
+  const totals =
+    mode === 'api' && apiSummary
+      ? {
+          impressions: apiSummary.total_impressions,
+          views: apiSummary.total_views,
+          requests: apiSummary.total_requests,
+          downloads: apiSummary.total_downloads,
+          hours: clientTotals.hours,
+        }
+      : clientTotals
+
+  const funnelData = useMemo(() => {
+    if (mode === 'api' && apiFunnel) {
+      return apiFunnel.map((s, i) => ({
+        name: s.label,
+        value: s.count,
+        fill: FUNNEL_PALETTE[i % FUNNEL_PALETTE.length],
+      }))
+    }
+    return [
       { name: 'インプレッション', value: totals.impressions, fill: '#3a8dde' },
       { name: '詳細閲覧', value: totals.views, fill: '#41c7b9' },
-      {
-        name: '申請 / DL',
-        value: totals.requests + totals.downloads,
-        fill: '#e0a458',
-      },
-    ],
-    [totals],
-  )
+      { name: '申請 / DL', value: totals.requests + totals.downloads, fill: '#e0a458' },
+    ]
+  }, [mode, apiFunnel, totals])
 
   const aspiceDist = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -120,6 +163,9 @@ export default function DashboardPage() {
 
   const emptyProcesses = aspiceDist.filter((d) => d.count === 0).map((d) => d.id)
 
+  // 直近月の新規登録数（monthlyTrend 末尾）
+  const latestMonthAdded = monthlyTrend.length ? monthlyTrend[monthlyTrend.length - 1].月次 : 0
+
   return (
     <div className="container section">
       <h1 className="page-title">📊 ダッシュボード</h1>
@@ -142,7 +188,7 @@ export default function DashboardPage() {
         <div className="kpi">
           <div className="kpi-num">{tools.length}</div>
           <div className="kpi-lbl">登録ツール総数</div>
-          <div className="kpi-sub">＋3 件（今月）</div>
+          <div className="kpi-sub">＋{latestMonthAdded} 件（直近月）</div>
         </div>
         <div className="kpi">
           <div className="kpi-num">{totals.impressions.toLocaleString()}</div>
@@ -153,7 +199,11 @@ export default function DashboardPage() {
           <div className="kpi-num">{totals.requests + totals.downloads}</div>
           <div className="kpi-lbl">アクセス権申請 / DL（最重要KPI）</div>
           <div className="kpi-sub">
-            変換率 {((totals.requests + totals.downloads) / totals.impressions * 100).toFixed(1)}%
+            変換率{' '}
+            {totals.impressions > 0
+              ? (((totals.requests + totals.downloads) / totals.impressions) * 100).toFixed(1)
+              : '0.0'}
+            %
           </div>
         </div>
         <div className="kpi">
