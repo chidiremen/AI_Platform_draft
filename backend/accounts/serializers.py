@@ -72,8 +72,39 @@ class AdminUserCreateSerializer(RegisterSerializer):
 
 
 class AdminUserUpdateSerializer(serializers.ModelSerializer):
-    """Admin updates an existing user's role / status / display name."""
+    """Admin updates an existing user's role / status / display name / password.
+
+    `password` を含めると管理者によるパスワードリセットとして扱う。
+    """
+
+    password = serializers.CharField(
+        write_only=True, required=False, allow_blank=False, min_length=4
+    )
 
     class Meta:
         model = User
-        fields = ["role", "display_name", "is_active", "email"]
+        fields = ["role", "display_name", "is_active", "email", "password"]
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop("password", None)
+        for k, v in validated_data.items():
+            setattr(instance, k, v)
+        if password:
+            instance.set_password(password)
+        instance.save()
+        return instance
+
+
+class MeUpdateSerializer(serializers.ModelSerializer):
+    """ログインユーザー本人が編集可能なフィールド（ロールやusernameは不可）。"""
+
+    class Meta:
+        model = User
+        fields = ["display_name", "email"]
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(style={"input_type": "password"})
+    new_password = serializers.CharField(
+        style={"input_type": "password"}, min_length=4
+    )

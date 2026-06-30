@@ -57,6 +57,20 @@ interface AppState {
   users: User[]
   addUser: (u: User) => Promise<{ ok: boolean; error?: string }>
   updateUserRole: (loginId: string, role: Role) => void
+  updateUser: (
+    loginId: string,
+    patch: { name?: string; email?: string; role?: Role; password?: string },
+  ) => Promise<{ ok: boolean; error?: string }>
+  deleteUser: (loginId: string) => Promise<{ ok: boolean; error?: string }>
+  // 自分のプロフィール
+  updateMyProfile: (patch: {
+    name?: string
+    email?: string
+  }) => Promise<{ ok: boolean; error?: string }>
+  changeMyPassword: (
+    oldPassword: string,
+    newPassword: string,
+  ) => Promise<{ ok: boolean; error?: string }>
   // ツール
   tools: Tool[]
   addTool: (input: NewToolInput) => Promise<string>
@@ -317,6 +331,159 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     },
     [users],
+  )
+
+  const updateUser = useCallback(
+    async (
+      loginId: string,
+      patch: { name?: string; email?: string; role?: Role; password?: string },
+    ) => {
+      const target = users.find((u) => u.loginId === loginId)
+      if (!target) return { ok: false, error: 'ユーザーが見つかりません' }
+      if (!USE_MOCK) {
+        if (target.id == null) {
+          return { ok: false, error: 'ユーザーIDが不明です' }
+        }
+        try {
+          const updated = await api.updateUserByAdmin(target.id, patch)
+          setUsers((prev) => prev.map((u) => (u.loginId === loginId ? updated : u)))
+          setCurrentUser((cu) =>
+            cu && cu.loginId === loginId ? { ...cu, ...updated } : cu,
+          )
+          toast(`✏️ ユーザー「${updated.name}」を更新しました`)
+          return { ok: true }
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : '更新に失敗しました' }
+        }
+      }
+      // モック: 表示名/メール/ロール/PWを更新
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.loginId === loginId
+            ? {
+                ...u,
+                name: patch.name ?? u.name,
+                email: patch.email ?? u.email,
+                role: patch.role ?? u.role,
+                password: patch.password ?? u.password,
+              }
+            : u,
+        ),
+      )
+      setCurrentUser((cu) =>
+        cu && cu.loginId === loginId
+          ? {
+              ...cu,
+              name: patch.name ?? cu.name,
+              email: patch.email ?? cu.email,
+              role: patch.role ?? cu.role,
+            }
+          : cu,
+      )
+      // モックではツールのauthor名（表示名）も同期して書き換える
+      if (patch.name && patch.name !== target.name) {
+        const newName = patch.name
+        setTools((prev) =>
+          prev.map((t) => (t.author === target.name ? { ...t, author: newName } : t)),
+        )
+      }
+      toast(`✏️ ユーザー「${patch.name ?? target.name}」を更新しました`)
+      return { ok: true }
+    },
+    [users, toast],
+  )
+
+  const deleteUser = useCallback(
+    async (loginId: string) => {
+      const target = users.find((u) => u.loginId === loginId)
+      if (!target) return { ok: false, error: 'ユーザーが見つかりません' }
+      if (currentUser && target.loginId === currentUser.loginId) {
+        return { ok: false, error: '自分自身は削除できません' }
+      }
+      if (!USE_MOCK) {
+        if (target.id == null) {
+          return { ok: false, error: 'ユーザーIDが不明です' }
+        }
+        try {
+          await api.deleteUserByAdmin(target.id)
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : '削除に失敗しました' }
+        }
+      }
+      setUsers((prev) => prev.filter((u) => u.loginId !== loginId))
+      toast(`🗑️ ユーザー「${target.name}」を削除しました`)
+      return { ok: true }
+    },
+    [users, currentUser, toast],
+  )
+
+  const updateMyProfile = useCallback(
+    async (patch: { name?: string; email?: string }) => {
+      if (!currentUser) return { ok: false, error: '未ログインです' }
+      const oldName = currentUser.name
+      if (!USE_MOCK) {
+        try {
+          const updated = await api.updateMe(patch)
+          setCurrentUser(updated)
+          setUsers((prev) =>
+            prev.map((u) => (u.loginId === currentUser.loginId ? updated : u)),
+          )
+          toast('✅ プロフィールを更新しました')
+          return { ok: true }
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : '更新に失敗しました' }
+        }
+      }
+      setCurrentUser((cu) =>
+        cu ? { ...cu, name: patch.name ?? cu.name, email: patch.email ?? cu.email } : cu,
+      )
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.loginId === currentUser.loginId
+            ? { ...u, name: patch.name ?? u.name, email: patch.email ?? u.email }
+            : u,
+        ),
+      )
+      if (patch.name && patch.name !== oldName) {
+        const newName = patch.name
+        setTools((prev) =>
+          prev.map((t) => (t.author === oldName ? { ...t, author: newName } : t)),
+        )
+      }
+      toast('✅ プロフィールを更新しました')
+      return { ok: true }
+    },
+    [currentUser, toast],
+  )
+
+  const changeMyPassword = useCallback(
+    async (oldPassword: string, newPassword: string) => {
+      if (!currentUser) return { ok: false, error: '未ログインです' }
+      if (!USE_MOCK) {
+        try {
+          await api.changePassword(oldPassword, newPassword)
+          // 既存トークンは無効化されたので、ローカルセッションも破棄
+          setCurrentUser(null)
+          toast('🔐 パスワードを更新しました。再ログインしてください。')
+          return { ok: true }
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : '変更に失敗しました' }
+        }
+      }
+      // モック: 旧PW検証 → 更新
+      if (currentUser.password !== oldPassword) {
+        return { ok: false, error: '現在のパスワードが正しくありません' }
+      }
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.loginId === currentUser.loginId ? { ...u, password: newPassword } : u,
+        ),
+      )
+      setCurrentUser((cu) => (cu ? { ...cu, password: newPassword } : cu))
+      toast('🔐 パスワードを更新しました')
+      return { ok: true }
+    },
+    [currentUser, toast],
   )
 
   // ── 権限 ──
@@ -666,6 +833,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       users,
       addUser,
       updateUserRole,
+      updateUser,
+      deleteUser,
+      updateMyProfile,
+      changeMyPassword,
       tools,
       addTool,
       updateTool,
@@ -694,6 +865,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       users,
       addUser,
       updateUserRole,
+      updateUser,
+      deleteUser,
+      updateMyProfile,
+      changeMyPassword,
       tools,
       addTool,
       updateTool,

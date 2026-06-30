@@ -71,3 +71,106 @@ class MemberRoleTests(APITestCase):
     def test_member_blocked_from_admin_users(self):
         res = token_client(self.member).get("/api/admin/users/")
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class AdminUserEditDeleteTests(APITestCase):
+    """管理者によるユーザー編集（表示名/メール/ロール/PWリセット）と削除。"""
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(username="root", password="pw")
+        self.member = User.objects.create_user(
+            username="m1", password="pw", role="member", display_name="メンバー1"
+        )
+
+    def test_admin_can_update_display_name_and_email(self):
+        res = token_client(self.admin).patch(
+            f"/api/admin/users/{self.member.id}/",
+            {"display_name": "改名後", "email": "new@example.com"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        self.assertEqual(res.data["display_name"], "改名後")
+        self.assertEqual(res.data["email"], "new@example.com")
+
+    def test_admin_can_reset_user_password(self):
+        res = token_client(self.admin).patch(
+            f"/api/admin/users/{self.member.id}/",
+            {"password": "newpass"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.member.refresh_from_db()
+        self.assertTrue(self.member.check_password("newpass"))
+
+    def test_admin_can_delete_user(self):
+        res = token_client(self.admin).delete(f"/api/admin/users/{self.member.id}/")
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(User.objects.filter(pk=self.member.pk).exists())
+
+    def test_admin_cannot_delete_self(self):
+        res = token_client(self.admin).delete(f"/api/admin/users/{self.admin.id}/")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(User.objects.filter(pk=self.admin.pk).exists())
+
+    def test_member_cannot_delete_anyone(self):
+        member2 = User.objects.create_user(username="m2", password="pw", role="member")
+        res = token_client(self.member).delete(f"/api/admin/users/{member2.id}/")
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class MeUpdateAndPasswordTests(APITestCase):
+    """自分のプロフィール更新・パスワード変更。"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="u", password="oldpw", role="member", display_name="旧名"
+        )
+
+    def test_me_patch_updates_display_name_and_email(self):
+        res = token_client(self.user).patch(
+            "/api/me/",
+            {"display_name": "新名", "email": "u@example.com"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        self.assertEqual(res.data["display_name"], "新名")
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.display_name, "新名")
+        self.assertEqual(self.user.email, "u@example.com")
+
+    def test_me_patch_cannot_change_role(self):
+        res = token_client(self.user).patch(
+            "/api/me/",
+            {"role": "admin", "display_name": "新名"},
+            format="json",
+        )
+        # role はシリアライザのフィールド外なので黙って無視される（200, member のまま）
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.role, "member")
+
+    def test_change_password_requires_correct_old(self):
+        client = token_client(self.user)
+        res = client.post(
+            "/api/me/password/",
+            {"old_password": "wrong", "new_password": "newpw"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("oldpw"))
+
+    def test_change_password_success_and_invalidates_token(self):
+        old_token, _ = Token.objects.get_or_create(user=self.user)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION=f"Token {old_token.key}")
+        res = client.post(
+            "/api/me/password/",
+            {"old_password": "oldpw", "new_password": "newpw"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("newpw"))
+        # 旧トークンは無効化されている
+        self.assertFalse(Token.objects.filter(key=old_token.key).exists())

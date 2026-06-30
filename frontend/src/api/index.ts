@@ -466,6 +466,59 @@ export async function updateUserRole(userId: number, role: Role): Promise<User> 
   return mapUser(d)
 }
 
+/**
+ * 管理者によるユーザー編集（表示名・メール・ロール・パスワードリセット）。
+ * 値が undefined のフィールドはペイロードに含めない。
+ */
+export async function updateUserByAdmin(
+  userId: number,
+  patch: { name?: string; email?: string; role?: Role; password?: string },
+): Promise<User> {
+  const body: Record<string, unknown> = {}
+  if (patch.name !== undefined) body.display_name = patch.name
+  if (patch.email !== undefined) body.email = patch.email
+  if (patch.role !== undefined) body.role = patch.role
+  if (patch.password) body.password = patch.password
+  const d = await apiFetch<UserDTO>(`/admin/users/${userId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+  return mapUser(d)
+}
+
+export async function deleteUserByAdmin(userId: number): Promise<void> {
+  await apiFetch<void>(`/admin/users/${userId}/`, { method: 'DELETE' })
+}
+
+/** ログイン中ユーザー自身のプロフィール更新（表示名・メール）。 */
+export async function updateMe(patch: {
+  name?: string
+  email?: string
+}): Promise<User> {
+  const body: Record<string, unknown> = {}
+  if (patch.name !== undefined) body.display_name = patch.name
+  if (patch.email !== undefined) body.email = patch.email
+  const d = await apiFetch<UserDTO>(`/me/`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+  return mapUser(d)
+}
+
+/** 自分のパスワード変更。成功時は既存トークンが無効化されるので再ログインが必要。 */
+export async function changePassword(
+  oldPassword: string,
+  newPassword: string,
+): Promise<void> {
+  await apiFetch<unknown>('/me/password/', {
+    method: 'POST',
+    body: JSON.stringify({
+      old_password: oldPassword,
+      new_password: newPassword,
+    }),
+  })
+}
+
 // ── メトリクス ──
 export type ActivityAction = 'impression' | 'view' | 'readme_scroll' | 'download'
 export async function postActivity(

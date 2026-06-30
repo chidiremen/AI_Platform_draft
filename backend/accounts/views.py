@@ -9,7 +9,9 @@ from .permissions import IsAdmin
 from .serializers import (
     AdminUserCreateSerializer,
     AdminUserUpdateSerializer,
+    ChangePasswordSerializer,
     LoginSerializer,
+    MeUpdateSerializer,
     RegisterSerializer,
     UserSerializer,
 )
@@ -79,10 +81,42 @@ class RegisterView(generics.CreateAPIView):
 # Current user
 # --------------------------------------------------------------------------- #
 class MeView(APIView):
+    """GET: 自分の情報を取得。PATCH: 表示名・メールを更新（自分自身のみ）。"""
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         return Response(UserSerializer(request.user).data)
+
+    def patch(self, request):
+        serializer = MeUpdateSerializer(
+            request.user, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(UserSerializer(request.user).data)
+
+
+class MePasswordView(APIView):
+    """自分のパスワード変更。旧パスワードによる本人確認が必須。"""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        old = serializer.validated_data["old_password"]
+        new = serializer.validated_data["new_password"]
+        if not request.user.check_password(old):
+            return Response(
+                {"detail": "現在のパスワードが正しくありません。"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        request.user.set_password(new)
+        request.user.save(update_fields=["password"])
+        # 既存トークンを無効化し、再ログインを促す
+        Token.objects.filter(user=request.user).delete()
+        return Response({"detail": "パスワードを更新しました。再ログインしてください。"})
 
 
 # --------------------------------------------------------------------------- #
@@ -106,7 +140,13 @@ class AdminUserListCreateView(generics.ListCreateAPIView):
         )
 
 
-class AdminUserDetailView(generics.RetrieveUpdateAPIView):
+class AdminUserDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """管理者: 個別ユーザーの取得・更新・削除。
+
+    DELETE はソフトに `is_active=False` ではなく実削除。ただし自分自身は削除
+    不可（管理者のロックアウト防止）。
+    """
+
     permission_classes = [IsAdmin]
     queryset = User.objects.all()
 
@@ -120,3 +160,13 @@ class AdminUserDetailView(generics.RetrieveUpdateAPIView):
         super().update(request, *args, **kwargs)
         instance = self.get_object()
         return Response(UserSerializer(instance).data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.pk == request.user.pk:
+            return Response(
+                {"detail": "自分自身を削除することはできません。"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

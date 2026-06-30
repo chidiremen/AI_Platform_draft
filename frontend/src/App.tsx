@@ -7,6 +7,7 @@ import MyPage from './pages/MyPage'
 import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
 import AdminUsersPage from './pages/AdminUsersPage'
+import ProfilePage from './pages/ProfilePage'
 import { AppProvider, useApp } from './store'
 
 function AuthedApp() {
@@ -41,6 +42,7 @@ function AuthedApp() {
           <Route path="/tools/:id" element={<ToolDetailPage />} />
           <Route path="/tools/:id/edit" element={<ToolFormPage />} />
           <Route path="/mypage" element={<MyPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route path="/admin/dashboard" element={<DashboardPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -59,7 +59,9 @@ export default function Header() {
           </Link>
 
           <div className="user-chip" title={currentUser?.email ?? ''}>
-            <span className="user-name">{currentUser?.name}</span>
+            <Link to="/profile" className="user-name user-name-link" title="プロフィール設定">
+              {currentUser?.name}
+            </Link>
             <span className={`role-pill role-${currentUser?.role}`}>
               {isAdmin ? '管理者' : 'メンバー'}
             </span>

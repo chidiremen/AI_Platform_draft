@@ -266,6 +266,96 @@ describe('管理者ページ（ユーザー管理）', () => {
     expect(await screen.findByText('山本健一')).toBeInTheDocument()
     expect(screen.getByText(/登録ユーザー一覧（11名）/)).toBeInTheDocument()
   })
+
+  it('編集ボタンから表示名を変更できる', async () => {
+    renderAt('/admin/users')
+    // 鈴木花子の行の「編集」ボタンをクリック（最初に現れる「編集」が rotaは一覧順序による）
+    // ここでは鈴木の行を特定するため、行のテキストから親<tr>を辿る
+    const row = screen.getByText('鈴木花子').closest('tr') as HTMLElement
+    expect(row).toBeTruthy()
+    fireEvent.click(within(row).getByRole('button', { name: /✏️ 編集/ }))
+    // モーダル内の表示名入力に新値を投入
+    const nameInput = screen.getByDisplayValue('鈴木花子')
+    fireEvent.change(nameInput, { target: { value: '鈴木はな子' } })
+    fireEvent.click(screen.getByRole('button', { name: /変更を保存/ }))
+    expect(await screen.findByText('鈴木はな子')).toBeInTheDocument()
+  })
+
+  it('自分自身の削除ボタンは無効化される', () => {
+    renderAt('/admin/users')
+    // ヘッダーと一覧の両方に田中太郎が現れるので、テーブルにスコープを限定
+    const table = document.querySelector('.data-table') as HTMLElement
+    const row = within(table).getByText('田中太郎').closest('tr') as HTMLElement
+    const delBtn = within(row).getByRole('button', { name: /🗑️ 削除/ })
+    expect(delBtn).toBeDisabled()
+  })
+
+  it('削除ボタンから他ユーザーを削除できる', async () => {
+    renderAt('/admin/users')
+    const row = screen.getByText('松本大輔').closest('tr') as HTMLElement
+    fireEvent.click(within(row).getByRole('button', { name: /🗑️ 削除/ }))
+    fireEvent.click(screen.getByRole('button', { name: '削除する' }))
+    expect(await screen.findByText(/登録ユーザー一覧（9名）/)).toBeInTheDocument()
+    expect(screen.queryByText('松本大輔')).not.toBeInTheDocument()
+  })
+})
+
+describe('プロフィール設定（自分の情報編集）', () => {
+  it('未ログインでは /profile にアクセスできない', () => {
+    localStorage.clear()
+    renderAt('/profile')
+    // ログイン画面が表示される
+    expect(screen.getByText('ログインID')).toBeInTheDocument()
+  })
+
+  it('ログインユーザーは自分のプロフィールを編集できる', async () => {
+    seedSession('suzuki')
+    renderAt('/profile')
+    expect(screen.getByText('⚙️ プロフィール設定')).toBeInTheDocument()
+    // ログインID とロールは disabled
+    const idInput = screen.getByDisplayValue('suzuki') as HTMLInputElement
+    expect(idInput.disabled).toBe(true)
+    expect(screen.getByDisplayValue('メンバー')).toBeDisabled()
+    // 表示名を変更
+    const nameInput = screen.getByDisplayValue('鈴木花子')
+    fireEvent.change(nameInput, { target: { value: '鈴木花子（更新）' } })
+    fireEvent.click(screen.getByRole('button', { name: /変更を保存/ }))
+    // ヘッダーのユーザー名リンクに新値が反映される
+    expect(await screen.findByRole('link', { name: '鈴木花子（更新）' })).toBeInTheDocument()
+  })
+
+  it('パスワード変更: 旧PW不一致だとエラー', async () => {
+    seedSession('suzuki')
+    renderAt('/profile')
+    const inputs = document.querySelectorAll('input[type="password"]')
+    fireEvent.change(inputs[0], { target: { value: 'wrong' } })
+    fireEvent.change(inputs[1], { target: { value: 'newpw' } })
+    fireEvent.change(inputs[2], { target: { value: 'newpw' } })
+    fireEvent.click(screen.getByRole('button', { name: /パスワードを変更/ }))
+    expect(await screen.findByText(/現在のパスワードが正しくありません/)).toBeInTheDocument()
+  })
+
+  it('パスワード変更: 新PW確認不一致だとエラー', async () => {
+    seedSession('suzuki')
+    renderAt('/profile')
+    const inputs = document.querySelectorAll('input[type="password"]')
+    fireEvent.change(inputs[0], { target: { value: 'password' } })
+    fireEvent.change(inputs[1], { target: { value: 'aaaa' } })
+    fireEvent.change(inputs[2], { target: { value: 'bbbb' } })
+    fireEvent.click(screen.getByRole('button', { name: /パスワードを変更/ }))
+    expect(await screen.findByText(/新しいパスワード（確認）が一致しません/)).toBeInTheDocument()
+  })
+
+  it('パスワード変更: 成功すると成功通知が出る', async () => {
+    seedSession('suzuki')
+    renderAt('/profile')
+    const inputs = document.querySelectorAll('input[type="password"]')
+    fireEvent.change(inputs[0], { target: { value: 'password' } })
+    fireEvent.change(inputs[1], { target: { value: 'newpassword' } })
+    fireEvent.change(inputs[2], { target: { value: 'newpassword' } })
+    fireEvent.click(screen.getByRole('button', { name: /パスワードを変更/ }))
+    expect(await screen.findByText(/パスワードを更新しました/)).toBeInTheDocument()
+  })
 })
 
 describe('権限によるダッシュボード表示の差分', () => {
