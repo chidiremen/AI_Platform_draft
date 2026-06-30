@@ -374,6 +374,11 @@ export async function resolveAccessRequest(
   })
 }
 
+/** 解決済み申請の履歴削除（申請者・登録者・管理者）。pendingは削除不可。 */
+export async function deleteAccessRequest(requestId: string): Promise<void> {
+  await apiFetch<void>(`/access-requests/${requestId}/`, { method: 'DELETE' })
+}
+
 /** zipダウンロード(認証必須)：blobとして取得し、ブラウザに保存させる。 */
 export async function downloadZip(toolId: string, filename = 'tool.zip'): Promise<void> {
   const token = getToken()
@@ -576,6 +581,10 @@ function mapComment(d: CommentDTO): ToolComment {
 
 export async function listComments(toolId: string): Promise<ToolComment[]> {
   return (await fetchAllPages<CommentDTO>(`/tools/${toolId}/comments/`)).map(mapComment)
+}
+
+export async function listIncomingComments(): Promise<ToolComment[]> {
+  return (await fetchAllPages<CommentDTO>('/me/incoming-comments/')).map(mapComment)
 }
 
 export async function createComment(

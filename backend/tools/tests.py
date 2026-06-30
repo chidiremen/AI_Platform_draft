@@ -442,3 +442,79 @@ class CommentTests(APITestCase):
         # 管理者は削除可
         res2 = token_client(self.admin).delete(f"/api/comments/{cid}/")
         self.assertEqual(res2.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_me_incoming_comments_returns_others_on_my_tools(self):
+        # 自分が登録したツールに、他人が付けたコメント
+        token_client(self.other).post(
+            f"/api/tools/{self.tool.id}/comments/",
+            {"body": "他人コメント", "comment_type": "general"},
+            format="json",
+        )
+        # 自分自身が付けたコメントは除外される
+        token_client(self.author).post(
+            f"/api/tools/{self.tool.id}/comments/",
+            {"body": "自分コメント", "comment_type": "general"},
+            format="json",
+        )
+        res = token_client(self.author).get("/api/me/incoming-comments/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        data = res.data["results"] if isinstance(res.data, dict) else res.data
+        bodies = [c["body"] for c in data]
+        self.assertIn("他人コメント", bodies)
+        self.assertNotIn("自分コメント", bodies)
+
+
+class AccessRequestDeleteTests(APITestCase):
+    """解決済みアクセス申請の履歴削除。"""
+
+    def setUp(self):
+        self.author = User.objects.create_user(
+            username="author", password="pw", role="member", display_name="作者"
+        )
+        self.requester = User.objects.create_user(
+            username="req", password="pw", role="member", display_name="申請者"
+        )
+        self.stranger = User.objects.create_user(
+            username="stranger", password="pw", role="member"
+        )
+        self.admin = User.objects.create_superuser(username="root", password="pw")
+        self.tool = Tool.objects.create(
+            title="t", summary="s", readme="r", tool_type="other", author=self.author
+        )
+
+    def _make_req(self, status_value="granted"):
+        from django.utils import timezone as tz
+        return AccessRequest.objects.create(
+            requester=self.requester,
+            tool=self.tool,
+            reason="r",
+            status=status_value,
+            resolved_at=tz.now() if status_value != "pending" else None,
+        )
+
+    def test_requester_can_delete_resolved(self):
+        req = self._make_req("granted")
+        res = token_client(self.requester).delete(f"/api/access-requests/{req.id}/")
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(AccessRequest.objects.filter(pk=req.pk).exists())
+
+    def test_author_can_delete_resolved(self):
+        req = self._make_req("rejected")
+        res = token_client(self.author).delete(f"/api/access-requests/{req.id}/")
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_admin_can_delete_any_resolved(self):
+        req = self._make_req("granted")
+        res = token_client(self.admin).delete(f"/api/access-requests/{req.id}/")
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_stranger_cannot_delete(self):
+        req = self._make_req("granted")
+        res = token_client(self.stranger).delete(f"/api/access-requests/{req.id}/")
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_pending_cannot_be_deleted(self):
+        req = self._make_req("pending")
+        res = token_client(self.author).delete(f"/api/access-requests/{req.id}/")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(AccessRequest.objects.filter(pk=req.pk).exists())

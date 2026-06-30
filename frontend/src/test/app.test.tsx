@@ -376,6 +376,8 @@ describe('マイページ', () => {
   it('ログインユーザーの登録ツールが表示される', () => {
     renderAt('/mypage')
     expect(screen.getByText(/ログイン中:/)).toBeInTheDocument()
+    // デフォルトは通知タブなので、登録ツールタブに切り替える
+    fireEvent.click(screen.getByRole('button', { name: /登録したツール/ }))
     // tanaka（田中太郎）は tool1 の登録者
     expect(
       screen.getByText('A-SPICE要件トレーサビリティチェッカー'),
@@ -390,10 +392,69 @@ describe('マイページ', () => {
     // SEED_REQUESTS の r1: 鈴木花子 → tool1（田中太郎）
     expect(screen.getByText('鈴木花子')).toBeInTheDocument()
     expect(screen.getByText('申請中')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /承認/ }))
-    expect(screen.queryByText('申請中')).not.toBeInTheDocument()
+    // テーブル内の承認ボタンを限定（通知タブにも承認ボタンがあるため）
+    const table = document.querySelector('.data-table') as HTMLElement
+    fireEvent.click(within(table).getByRole('button', { name: /承認/ }))
+    expect(within(table).queryByText('申請中')).not.toBeInTheDocument()
     // 既存の granted（r0）と合わせて2件表示される
-    expect(screen.getAllByText('承認済み').length).toBeGreaterThanOrEqual(1)
+    expect(within(table).getAllByText('承認済み').length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('マイページ: 通知タブ', () => {
+  it('デフォルトで通知タブが開き、未対応申請とコメントが表示される', () => {
+    renderAt('/mypage')
+    // 未対応申請のサマリ（SEED_REQUESTS の r1）
+    expect(screen.getByText(/未対応申請:/)).toBeInTheDocument()
+    expect(screen.getByText(/ツールへのコメント:/)).toBeInTheDocument()
+    // 申請セクションが存在
+    expect(screen.getByText('📨 申請が届いています')).toBeInTheDocument()
+    expect(screen.getByText('💬 自分のツールへのコメント')).toBeInTheDocument()
+  })
+
+  it('未読件数バッジが通知タブに付く', () => {
+    renderAt('/mypage')
+    const notifTab = screen.getByRole('button', { name: /🔔 通知/ })
+    // SEED_COMMENTS のc1（鈴木花子→tool1） とc3（佐藤一郎→tool1）+ r1 = 未読3
+    const badge = notifTab.querySelector('.tab-badge')
+    expect(badge).not.toBeNull()
+    expect(Number(badge!.textContent)).toBeGreaterThanOrEqual(1)
+  })
+
+  it('「すべて既読にする」を押すとバッジが消える', () => {
+    renderAt('/mypage')
+    fireEvent.click(screen.getByRole('button', { name: /すべて既読にする/ }))
+    const notifTab = screen.getByRole('button', { name: /🔔 通知/ })
+    expect(notifTab.querySelector('.tab-badge')).toBeNull()
+  })
+})
+
+describe('マイページ: 申請履歴の削除', () => {
+  it('解決済みの被申請は履歴削除ボタンで消える', async () => {
+    renderAt('/mypage')
+    fireEvent.click(
+      screen.getByRole('button', { name: /自分のツールへの被申請/ }),
+    )
+    // SEED_REQUESTS r0 は granted（tool3 への佐藤一郎が処理者ではない…
+    // tool1 への申請を granted にしてから削除）
+    // ここでは r1 を一度承認して granted にし、その削除をテストする
+    const table = document.querySelector('.data-table') as HTMLElement
+    fireEvent.click(within(table).getByRole('button', { name: /承認/ }))
+    // 解決済みになると 🗑️ ボタンが現れる
+    const delBtn = within(table).getByRole('button', { name: '🗑️' })
+    fireEvent.click(delBtn)
+    expect(within(table).queryByText('鈴木花子')).not.toBeInTheDocument()
+  })
+
+  it('未処理（申請中）の被申請に削除ボタンは無い', () => {
+    renderAt('/mypage')
+    fireEvent.click(
+      screen.getByRole('button', { name: /自分のツールへの被申請/ }),
+    )
+    const table = document.querySelector('.data-table') as HTMLElement
+    // pending には削除ボタンが無いことを確認（このタブには pending r1 と granted r0 が存在するが
+    // r0 は tool3 の佐藤一郎宛で田中太郎ではない → 田中太郎宛の incoming は r1 のみで pending）
+    expect(within(table).queryByRole('button', { name: '🗑️' })).not.toBeInTheDocument()
   })
 })
 

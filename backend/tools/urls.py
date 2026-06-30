@@ -22,6 +22,16 @@ urlpatterns = [
         views.AccessRequestResolveView.as_view(),
         name="access-request-resolve",
     ),
+    path(
+        "access-requests/<uuid:pk>/",
+        views.AccessRequestDeleteView.as_view(),
+        name="access-request-delete",
+    ),
+    path(
+        "me/incoming-comments/",
+        views.MeIncomingCommentsView.as_view(),
+        name="me-incoming-comments",
+    ),
     # コメント関連
     path(
         "tools/<uuid:tool_id>/comments/",

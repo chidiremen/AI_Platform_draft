@@ -329,6 +329,35 @@ class AccessRequestResolveView(generics.UpdateAPIView):
         return self.update(request, *args, **kwargs)
 
 
+class AccessRequestDeleteView(generics.DestroyAPIView):
+    """解決済み (granted/rejected) の申請を、関係者が履歴から削除する。
+
+    削除可能: 申請者本人 / 対象ツールの登録者 / 管理者
+    削除不可: status=pending（処理中の申請を消すのは不自然）
+    """
+
+    permission_classes = [IsAuthenticated]
+    queryset = AccessRequest.objects.select_related("tool", "requester")
+
+    def destroy(self, request, *args, **kwargs):
+        req = self.get_object()
+        user = request.user
+        is_related = (
+            req.requester_id == user.id
+            or req.tool.author_id == user.id
+            or is_admin(user)
+        )
+        if not is_related:
+            raise PermissionDenied("この申請を削除する権限がありません。")
+        if req.status == AccessRequest.Status.PENDING:
+            return Response(
+                {"detail": "未処理（申請中）の申請は削除できません。"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        req.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 # --------------------------------------------------------------------------- #
 # Comments
 # --------------------------------------------------------------------------- #
@@ -407,3 +436,21 @@ class CommentLikeView(generics.GenericAPIView):
             liked = True
         like_count = CommentLike.objects.filter(comment=comment).count()
         return Response({"liked": liked, "like_count": like_count})
+
+
+class MeIncomingCommentsView(generics.ListAPIView):
+    """自分が登録したツールに対して付けられたコメント一覧（自分自身が
+    書いたものは除く）。マイページの通知用。
+    """
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = CommentSerializer
+
+    def get_queryset(self):
+        return (
+            Comment.objects.filter(tool__author=self.request.user)
+            .exclude(author=self.request.user)
+            .select_related("author", "tool")
+            .prefetch_related("likes")
+            .order_by("-created_at")
+        )

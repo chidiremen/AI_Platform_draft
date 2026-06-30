@@ -87,6 +87,14 @@ interface AppState {
   recordActivity: (toolId: string, action: 'impression' | 'view' | 'readme_scroll') => void
   /** 申請の承認/却下（登録者本人または管理者）。 */
   resolveRequest: (requestId: string, status: 'granted' | 'rejected') => Promise<void>
+  /** 解決済み申請を履歴から削除（申請者・登録者・管理者）。 */
+  deleteRequest: (requestId: string) => Promise<{ ok: boolean; error?: string }>
+  /** 自分のツールに付いた他人のコメント（マイページの通知用）。 */
+  incomingComments: ToolComment[]
+  /** 既読化された通知（コメントID / 申請ID）。localStorage に永続化。 */
+  readNotificationIds: Set<string>
+  markNotificationRead: (id: string) => void
+  markAllNotificationsRead: () => void
   // コメント
   getComments: (toolId: string) => ToolComment[]
   loadComments: (toolId: string) => Promise<void>
@@ -190,9 +198,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     USE_MOCK ? SEED_REQUESTS : [],
   )
   const [comments, setComments] = useState<ToolComment[]>(USE_MOCK ? SEED_COMMENTS : [])
+  // 自分のツールに付いた他人のコメント（マイページ通知用）
+  const [incomingComments, setIncomingComments] = useState<ToolComment[]>([])
   // API モードで「すでにフェッチ済みの toolId」を覚えておき、再描画ごとに
   // 再取得しないようにする。
   const commentsLoaded = useRef<Set<string>>(new Set())
+  // 既読化された通知IDセット（localStorage 永続化）
+  const READ_KEY = 'aitc_read_notif_v1'
+  const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(
+    () => {
+      try {
+        const raw = localStorage.getItem(READ_KEY)
+        if (!raw) return new Set()
+        return new Set(JSON.parse(raw) as string[])
+      } catch {
+        return new Set()
+      }
+    },
+  )
   const [toastMsg, setToastMsg] = useState<string | null>(null)
   const [loading, setLoading] = useState<boolean>(!USE_MOCK)
   // ファネル計測の重複排除（action:toolId をセッション内で一度だけ計上）
@@ -208,16 +231,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const list = await api.listTools()
     setTools(list)
     if (me) {
-      const [likes, reqs, incoming] = await Promise.all([
+      const [likes, reqs, incoming, incomingCmts] = await Promise.all([
         api.myLikes(),
         api.myRequests(),
         api.incomingRequests(me.name),
+        api.listIncomingComments().catch(() => [] as ToolComment[]),
       ])
       setLikedIds(new Set(likes.map((t) => t.id)))
       const byId = new Map<string, AccessRequestRecord>()
       for (const r of reqs) byId.set(r.id, r)
       for (const r of incoming) byId.set(r.id, r) // author 入りで上書き
       setRequests([...byId.values()])
+      setIncomingComments(incomingCmts)
       if (me.role === 'admin') {
         try {
           setUsers(await api.listUsers())
@@ -228,8 +253,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } else {
       setLikedIds(new Set())
       setRequests([])
+      setIncomingComments([])
     }
   }, [])
+
+  // モックモード: 自分のツールに付いた他人のコメントを comments から導出
+  useEffect(() => {
+    if (!USE_MOCK) return
+    if (!currentUser) {
+      setIncomingComments([])
+      return
+    }
+    const myToolIds = new Set(
+      tools.filter((t) => t.author === currentUser.name).map((t) => t.id),
+    )
+    const incoming = comments.filter(
+      (c) => myToolIds.has(c.toolId) && c.author !== currentUser.name,
+    )
+    // 新しい順
+    incoming.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    setIncomingComments(incoming)
+  }, [currentUser, tools, comments])
 
   // 実APIモードの初期ロード（セッション復元＋データ取得）
   useEffect(() => {
@@ -687,6 +731,63 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [toast],
   )
 
+  const deleteRequest = useCallback(
+    async (requestId: string) => {
+      const target = requests.find((r) => r.id === requestId)
+      if (!target) return { ok: false, error: '対象の申請が見つかりません' }
+      if (target.status === 'pending') {
+        return { ok: false, error: '未処理の申請は削除できません' }
+      }
+      if (!USE_MOCK) {
+        try {
+          await api.deleteAccessRequest(requestId)
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : '削除に失敗しました' }
+        }
+      }
+      setRequests((prev) => prev.filter((r) => r.id !== requestId))
+      toast('🗑️ 申請履歴を削除しました')
+      return { ok: true }
+    },
+    [requests, toast],
+  )
+
+  // ── 通知の既読管理 ──
+  const persistRead = useCallback((ids: Set<string>) => {
+    try {
+      localStorage.setItem(READ_KEY, JSON.stringify([...ids]))
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const markNotificationRead = useCallback(
+    (id: string) => {
+      setReadNotificationIds((prev) => {
+        if (prev.has(id)) return prev
+        const next = new Set(prev)
+        next.add(id)
+        persistRead(next)
+        return next
+      })
+    },
+    [persistRead],
+  )
+
+  const markAllNotificationsRead = useCallback(() => {
+    setReadNotificationIds((prev) => {
+      const next = new Set(prev)
+      for (const c of incomingComments) next.add(c.id)
+      for (const r of requests) {
+        if (r.author === (currentUser?.name ?? '') && r.status === 'pending') {
+          next.add(r.id)
+        }
+      }
+      persistRead(next)
+      return next
+    })
+  }, [incomingComments, requests, currentUser, persistRead])
+
   // ── コメント ──
   const getComments = useCallback(
     (toolId: string) => comments.filter((c) => c.toolId === toolId),
@@ -848,6 +949,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       recordDownload,
       recordActivity,
       resolveRequest,
+      deleteRequest,
+      incomingComments,
+      readNotificationIds,
+      markNotificationRead,
+      markAllNotificationsRead,
       getComments,
       loadComments,
       addComment,
@@ -880,6 +986,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       recordDownload,
       recordActivity,
       resolveRequest,
+      deleteRequest,
+      incomingComments,
+      readNotificationIds,
+      markNotificationRead,
+      markAllNotificationsRead,
       getComments,
       loadComments,
       addComment,
