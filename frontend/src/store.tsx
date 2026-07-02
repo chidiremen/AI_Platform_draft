@@ -187,17 +187,53 @@ const SEED_REQUESTS: AccessRequestRecord[] = [
   },
 ]
 
+// ── モックモードの永続化キー ──
+// 実APIモードでは常にサーバから取得するため使用しない。モックデモを開いたまま
+// ブラウザを再読み込みしても、ユーザー生成データ（コメント・申請・いいね・
+// 編集済みツール）を失わないようにする。
+const MOCK_KEYS = {
+  tools: 'aitc_mock_tools_v1',
+  comments: 'aitc_mock_comments_v1',
+  requests: 'aitc_mock_requests_v1',
+  likes: 'aitc_mock_likes_v1',
+} as const
+
+function loadPersisted<T>(key: string, fallback: T): T {
+  if (!USE_MOCK) return fallback
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return fallback
+    return JSON.parse(raw) as T
+  } catch {
+    return fallback
+  }
+}
+function savePersisted(key: string, value: unknown) {
+  if (!USE_MOCK) return
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    /* quota exceeded, private mode, etc. */
+  }
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>(USE_MOCK ? MOCK_USERS : [])
   const [currentUser, setCurrentUser] = useState<User | null>(
     USE_MOCK ? loadSession(MOCK_USERS) : null,
   )
-  const [tools, setTools] = useState<Tool[]>(USE_MOCK ? MOCK_TOOLS : [])
-  const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
-  const [requests, setRequests] = useState<AccessRequestRecord[]>(
-    USE_MOCK ? SEED_REQUESTS : [],
+  const [tools, setTools] = useState<Tool[]>(
+    USE_MOCK ? loadPersisted<Tool[]>(MOCK_KEYS.tools, MOCK_TOOLS) : [],
   )
-  const [comments, setComments] = useState<ToolComment[]>(USE_MOCK ? SEED_COMMENTS : [])
+  const [likedIds, setLikedIds] = useState<Set<string>>(
+    () => new Set(loadPersisted<string[]>(MOCK_KEYS.likes, [])),
+  )
+  const [requests, setRequests] = useState<AccessRequestRecord[]>(
+    USE_MOCK ? loadPersisted<AccessRequestRecord[]>(MOCK_KEYS.requests, SEED_REQUESTS) : [],
+  )
+  const [comments, setComments] = useState<ToolComment[]>(
+    USE_MOCK ? loadPersisted<ToolComment[]>(MOCK_KEYS.comments, SEED_COMMENTS) : [],
+  )
   // 自分のツールに付いた他人のコメント（マイページ通知用）
   const [incomingComments, setIncomingComments] = useState<ToolComment[]>([])
   // API モードで「すでにフェッチ済みの toolId」を覚えておき、再描画ごとに
@@ -256,6 +292,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setIncomingComments([])
     }
   }, [])
+
+  // モックモード: 各状態を localStorage に永続化してリロード耐性を持たせる
+  useEffect(() => { savePersisted(MOCK_KEYS.tools, tools) }, [tools])
+  useEffect(() => { savePersisted(MOCK_KEYS.comments, comments) }, [comments])
+  useEffect(() => { savePersisted(MOCK_KEYS.requests, requests) }, [requests])
+  useEffect(() => {
+    savePersisted(MOCK_KEYS.likes, [...likedIds])
+  }, [likedIds])
 
   // モックモード: 自分のツールに付いた他人のコメントを comments から導出
   useEffect(() => {

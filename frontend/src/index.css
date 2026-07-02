@@ -36,14 +36,25 @@
   box-sizing: border-box;
 }
 
+html {
+  /* 下地色: overscroll(2本指スクロールの反発)時に白背景が透けるのを防ぐ */
+  background-color: var(--bg-900);
+  /* overscroll のバウンス自体を抑止（Edge/Chrome/Safari） */
+  overscroll-behavior: none;
+}
 html,
 body {
   margin: 0;
   padding: 0;
   background: radial-gradient(circle at 20% -10%, #16294a 0%, var(--bg-900) 55%);
   background-attachment: fixed;
+  background-repeat: no-repeat;
   color: var(--text);
   min-height: 100vh;
+}
+body {
+  /* body 側にも overscroll 抑止（一部ブラウザで html だけでは効かないため） */
+  overscroll-behavior: none;
 }
 
 a {
@@ -1729,4 +1740,13 @@ button.shot {
   font-size: 13px;
   color: var(--text-muted);
   cursor: pointer;
+}
+
+/* ── 申請モーダル: 種別ごとの入力フィールド ── */
+.request-fieldset {
+  background: rgba(79, 157, 222, 0.06);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 14px;
 }

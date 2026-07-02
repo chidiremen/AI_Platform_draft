@@ -526,3 +526,47 @@ describe('スクリーンショットのライトボックス（モーダル）'
     expect(document.querySelector('a.shot')).toBeNull()
   })
 })
+
+describe('申請モーダル: 種別に応じた入力欄', () => {
+  it('GitHubリポジトリ型ツールでは GitHub ユーザー名が必須', () => {
+    // tool 3 = GitHub repo（佐藤一郎登録）。tanaka は登録者ではないため申請可能
+    renderAt('/tools/3')
+    fireEvent.click(screen.getByRole('button', { name: /管理者にアクセス権を申請/ }))
+    expect(screen.getByText(/GitHubユーザー名/)).toBeInTheDocument()
+    // 未入力なら「申請を送信」ボタンは無効
+    const submit = screen.getByRole('button', { name: '申請を送信' })
+    expect(submit).toBeDisabled()
+    // 入力すると有効化
+    fireEvent.change(screen.getByPlaceholderText(/例: octocat/), {
+      target: { value: 'yamada-taro' },
+    })
+    expect(submit).not.toBeDisabled()
+  })
+
+  it('NotebookLM 型ツールでは Google アカウントの入力欄が出る', () => {
+    // tool 2 = notebook_lm（鈴木花子登録）
+    renderAt('/tools/2')
+    fireEvent.click(screen.getByRole('button', { name: /管理者にアクセス権を申請/ }))
+    expect(screen.getByText(/Google アカウント/)).toBeInTheDocument()
+  })
+
+  it('Copilotエージェント型ツールでは社内メールの入力欄が出る', () => {
+    // tool 5 = copilot_agent（高橋美咲登録）
+    renderAt('/tools/5')
+    fireEvent.click(screen.getByRole('button', { name: /管理者にアクセス権を申請/ }))
+    expect(screen.getByText(/社内メールアドレス/)).toBeInTheDocument()
+  })
+})
+
+describe('モックモード: 永続化（リロード耐性）', () => {
+  it('投稿したコメントが localStorage に保存される', () => {
+    renderAt('/tools/1')
+    fireEvent.change(screen.getByPlaceholderText(/コメント本文を入力/), {
+      target: { value: '永続化テスト' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /コメントを投稿/ }))
+    const raw = localStorage.getItem('aitc_mock_comments_v1')
+    expect(raw).not.toBeNull()
+    expect(raw!).toContain('永続化テスト')
+  })
+})
