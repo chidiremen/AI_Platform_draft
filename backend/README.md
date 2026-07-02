@@ -39,12 +39,12 @@ python manage.py seed_data
 #    createsuperuser で作成したユーザーは自動的に role=admin（組織管理者）として扱われます。
 python manage.py createsuperuser
 
-# 7. Run the dev server
-python manage.py runserver
+# 7. Run the dev server（ポート衝突回避のため 5174 を明示指定）
+python manage.py runserver 5174
 ```
 
-The API is served under `http://localhost:8000/api/` and the Django admin at
-`http://localhost:8000/admin/`.
+The API is served under `http://localhost:5174/api/` and the Django admin at
+`http://localhost:5174/admin/`.
 
 ### Seeded accounts (from `seed_data`)
 
@@ -65,8 +65,8 @@ Read from the environment (or a `.env` file via `python-dotenv`):
 | `SECRET_KEY`           | dev placeholder                                      | Django secret key. **Set a real one.**       |
 | `DEBUG`                | `True`                                               | Debug mode toggle.                           |
 | `ALLOWED_HOSTS`        | `localhost,127.0.0.1,0.0.0.0`                        | Comma-separated allowed hosts.               |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173`        | React (Vite) dev origins allowed via CORS.   |
-| `CSRF_TRUSTED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173`        | Trusted origins for CSRF.                    |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:8009,http://127.0.0.1:8009`        | React (Vite) dev origins allowed via CORS.   |
+| `CSRF_TRUSTED_ORIGINS` | `http://localhost:8009,http://127.0.0.1:8009`        | Trusted origins for CSRF.                    |
 | `TEAMS_WEBHOOK_URL`    | empty                                                | MS Teams incoming webhook (notifications).   |
 
 ## Apps

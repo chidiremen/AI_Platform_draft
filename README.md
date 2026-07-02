@@ -23,7 +23,7 @@
 | 実API | `VITE_USE_MOCK=false` | Django バックエンドに接続（認証はDRF Tokenを localStorage 保持） |
 
 ```bash
-# 実APIモードで起動（バックエンドを :8000 で起動済みのこと）
+# 実APIモードで起動（バックエンドを :5174 で起動済みのこと）
 cd frontend
 cp .env.example .env.local        # VITE_USE_MOCK=false を有効化
 npm run dev
@@ -66,7 +66,7 @@ npm run dev
 ```bash
 cd frontend
 npm install
-npm run dev      # 開発サーバ起動（http://localhost:5173）
+npm run dev      # 開発サーバ起動（http://localhost:8009）
 npm run build    # 本番ビルド（tsc 型チェック + vite build）
 npm run preview  # ビルド結果のプレビュー
 ```

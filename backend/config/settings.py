@@ -164,15 +164,15 @@ REST_FRAMEWORK = {
 }
 
 # --------------------------------------------------------------------------- #
-# CORS (React dev server on Vite default port)
+# CORS (React dev server on Vite; ポート衝突回避のため 8009 を使用)
 # --------------------------------------------------------------------------- #
 CORS_ALLOWED_ORIGINS = os.environ.get(
     "CORS_ALLOWED_ORIGINS",
-    "http://localhost:5173,http://127.0.0.1:5173",
+    "http://localhost:8009,http://127.0.0.1:8009",
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = os.environ.get(
     "CSRF_TRUSTED_ORIGINS",
-    "http://localhost:5173,http://127.0.0.1:5173",
+    "http://localhost:8009,http://127.0.0.1:8009",
 ).split(",")
