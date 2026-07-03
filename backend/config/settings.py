@@ -8,15 +8,17 @@ development defaults. Uses SQLite for local development.
 import os
 from pathlib import Path
 
-# Optional .env support (python-dotenv). Safe no-op if not installed.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Optional .env support (python-dotenv). プロジェクトルート `.env` を最初に、
+# backend/.env をその後に読み込む（後者が優先）。
 try:
     from dotenv import load_dotenv
 
-    load_dotenv()
+    load_dotenv(BASE_DIR.parent / ".env")
+    load_dotenv(BASE_DIR / ".env")
 except Exception:  # pragma: no cover - dotenv is optional
     pass
-
-BASE_DIR = Path(__file__).resolve().parent.parent
 
 # --------------------------------------------------------------------------- #
 # Core / security
@@ -164,15 +166,19 @@ REST_FRAMEWORK = {
 }
 
 # --------------------------------------------------------------------------- #
-# CORS (React dev server on Vite; ポート衝突回避のため 8009 を使用)
+# CORS / CSRF
+#   デフォルト値は FRONTEND_PORT から自動生成。明示的に上書きしたい場合は
+#   環境変数 CORS_ALLOWED_ORIGINS / CSRF_TRUSTED_ORIGINS を設定する。
 # --------------------------------------------------------------------------- #
+_FRONTEND_PORT = os.environ.get("FRONTEND_PORT", "5174")
+_default_origins = (
+    f"http://localhost:{_FRONTEND_PORT},http://127.0.0.1:{_FRONTEND_PORT}"
+)
 CORS_ALLOWED_ORIGINS = os.environ.get(
-    "CORS_ALLOWED_ORIGINS",
-    "http://localhost:8009,http://127.0.0.1:8009",
+    "CORS_ALLOWED_ORIGINS", _default_origins
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = os.environ.get(
-    "CSRF_TRUSTED_ORIGINS",
-    "http://localhost:8009,http://127.0.0.1:8009",
+    "CSRF_TRUSTED_ORIGINS", _default_origins
 ).split(",")

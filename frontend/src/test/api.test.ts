@@ -192,7 +192,7 @@ describe('一覧のページネーション（回帰: 全件取得）', () => {
   })
 
   it('listTools は next を辿って全ページを結合する', async () => {
-    const page2 = 'http://localhost:5174/api/tools/?page=2'
+    const page2 = 'http://localhost:8009/api/tools/?page=2'
     const fetchMock = vi.fn(async (url: string) => {
       if (url.includes('page=2')) {
         return jsonResponse({ count: 3, next: null, results: [toolDTO('3')] })
