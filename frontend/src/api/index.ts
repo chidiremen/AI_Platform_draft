@@ -23,7 +23,7 @@ function setToken(token: string) {
     /* ignore */
   }
 }
-function clearToken() {
+export function clearToken() {
   try {
     localStorage.removeItem(TOKEN_KEY)
   } catch {
@@ -48,7 +48,12 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers as Record<string, string>),
   }
-  if (token) headers['Authorization'] = `Token ${token}`
+  // ログイン/登録エンドポイントは AllowAny なので、古いトークンを付けて
+  // 呼ぶと DRF の TokenAuthentication に先に叩き落されて 401 になる。
+  // 認証用エンドポイント宛には Authorization を付けない（防御的措置）。
+  const isAuthEndpoint =
+    path.startsWith('/auth/login') || path.startsWith('/auth/register')
+  if (token && !isAuthEndpoint) headers['Authorization'] = `Token ${token}`
 
   // path は相対（/tools/ 等）または絶対（ページネーションの next）の両方を許容。
   const url = path.startsWith('http') ? path : `${API_BASE}${path}`
@@ -522,6 +527,10 @@ export async function changePassword(
       new_password: newPassword,
     }),
   })
+  // 変更成功時、サーバ側で既存トークンが無効化されている。
+  // ローカルに残った古いトークンを付けて次の認証リクエストを叩くと 401 に
+  // なるため、必ずクリアする。
+  clearToken()
 }
 
 // ── メトリクス ──
