@@ -429,7 +429,11 @@ export default function ToolFormPage() {
           />
         </div>
 
-        {submitError && <div className="login-error">{submitError}</div>}
+        {submitError && (
+          <div className="login-error" style={{ whiteSpace: 'pre-line' }}>
+            {submitError}
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
           <button type="button" className="btn btn-ghost" onClick={() => navigate(-1)}>

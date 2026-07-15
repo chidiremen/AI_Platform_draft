@@ -67,13 +67,45 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
 
   if (res.status === 204) return undefined as T
   const text = await res.text()
-  const data = text ? JSON.parse(text) : null
+  let data: unknown = null
+  try {
+    data = text ? JSON.parse(text) : null
+  } catch {
+    /* JSON でないレスポンス（HTMLエラーページ等）はそのまま扱う */
+  }
   if (!res.ok) {
-    const detail =
-      (data && (data.detail || data.non_field_errors?.[0])) || `APIエラー (${res.status})`
-    throw new ApiError(res.status, detail)
+    throw new ApiError(res.status, extractApiErrorMessage(data, text, res.status))
   }
   return data as T
+}
+
+/**
+ * DRF のエラーレスポンスから人間可読なメッセージを取り出す。
+ *   1. `detail` （認可・認証系）
+ *   2. `non_field_errors` （フォーム全体）
+ *   3. フィールド別エラー `{field: ["メッセージ"]}` を「field: メッセージ」に整形
+ *   4. どれも該当しなければ生テキスト or 「APIエラー (status)」
+ */
+function extractApiErrorMessage(data: unknown, rawText: string, status: number): string {
+  if (data && typeof data === 'object') {
+    const obj = data as Record<string, unknown>
+    if (typeof obj.detail === 'string') return obj.detail
+    const nfe = obj.non_field_errors
+    if (Array.isArray(nfe) && typeof nfe[0] === 'string') return nfe[0]
+    // フィールド別エラーを列挙
+    const parts: string[] = []
+    for (const [key, val] of Object.entries(obj)) {
+      if (key === 'detail' || key === 'non_field_errors') continue
+      if (Array.isArray(val)) {
+        parts.push(`${key}: ${val.filter((v) => typeof v === 'string').join(' / ')}`)
+      } else if (typeof val === 'string') {
+        parts.push(`${key}: ${val}`)
+      }
+    }
+    if (parts.length) return parts.join('\n')
+  }
+  if (rawText && rawText.length < 300) return rawText
+  return `APIエラー (${status})`
 }
 
 /**
