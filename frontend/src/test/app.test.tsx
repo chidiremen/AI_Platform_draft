@@ -581,6 +581,26 @@ describe('コメント機能', () => {
   })
 })
 
+describe('ツール詳細: アクセスURL 表示', () => {
+  it('accessUrl があるツールでは URL がクリック可能なリンクとして表示される', () => {
+    // tool 1 は accessUrl を持つ copilot_agent
+    renderAt('/tools/1')
+    expect(screen.getByText('🔗 アクセス先URL')).toBeInTheDocument()
+    const link = screen.getByRole('link', {
+      name: /copilotstudio.microsoft.com\/agents\/traceability-checker/,
+    }) as HTMLAnchorElement
+    expect(link).toBeInTheDocument()
+    expect(link.href).toContain('copilotstudio.microsoft.com')
+    expect(link.target).toBe('_blank')
+  })
+
+  it('accessUrl が無いツール (zip種別など) では URL 表示ブロックが出ない', () => {
+    // tool 4 は zip_upload で accessUrl 無し
+    renderAt('/tools/4')
+    expect(screen.queryByText('🔗 アクセス先URL')).not.toBeInTheDocument()
+  })
+})
+
 describe('スクリーンショットのライトボックス（モーダル）', () => {
   it('スクリーンショットが無いときはライトボックスを開かない', () => {
     // tool 1 はスクリーンショット未登録 → ボタンも無い

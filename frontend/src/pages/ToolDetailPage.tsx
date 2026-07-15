@@ -226,17 +226,20 @@ export default function ToolDetailPage() {
             </div>
 
             {tool.accessUrl && (
-              <p
-                style={{
-                  fontSize: 12,
-                  color: 'var(--text-dim)',
-                  marginTop: 14,
-                  marginBottom: 0,
-                  wordBreak: 'break-all',
-                }}
-              >
-                実体: {tool.accessUrl}
-              </p>
+              <div className="access-url-box">
+                <div className="access-url-label">🔗 アクセス先URL</div>
+                <a
+                  className="access-url-link"
+                  href={tool.accessUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {tool.accessUrl}
+                </a>
+                <div className="access-url-hint">
+                  ※ アクセスには権限が必要な場合があります（上の申請ボタンから）
+                </div>
+              </div>
             )}
           </div>
 

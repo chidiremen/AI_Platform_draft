@@ -1242,6 +1242,38 @@ h3 {
   .col-8, .col-6, .col-4 { grid-column: span 12; }
 }
 
+/* ── ツール詳細: アクセスURL 表示 ── */
+.access-url-box {
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: rgba(79, 157, 222, 0.08);
+  border-left: 3px solid var(--accent-bright);
+  border-radius: var(--radius-sm);
+}
+.access-url-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  letter-spacing: 0.02em;
+}
+.access-url-link {
+  display: inline-block;
+  color: var(--accent-bright);
+  font-size: 13px;
+  word-break: break-all;
+  line-height: 1.4;
+  text-decoration: none;
+}
+.access-url-link:hover {
+  text-decoration: underline;
+}
+.access-url-hint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
 /* ── ツール登録: 必須項目案内バナー ── */
 .required-notice {
   padding: 10px 14px;
