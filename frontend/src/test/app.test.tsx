@@ -192,6 +192,72 @@ describe('ツールの編集・削除（登録者・管理者）', () => {
   })
 })
 
+describe('ツール登録: 必須項目バリデーション', () => {
+  it('必須項目案内バナーが表示される', () => {
+    renderAt('/tools/new')
+    expect(screen.getByText(/は必須項目/)).toBeInTheDocument()
+    expect(screen.getByText(/ツール名 \/ 概要/)).toBeInTheDocument()
+  })
+
+  // フォームの必須項目を「効果2つ以外」全部埋めるヘルパ
+  function fillFormExceptEffect() {
+    // 業務シーンを1つ選択
+    fireEvent.click(screen.getByRole('button', { name: /メール処理/ }))
+    fireEvent.change(screen.getByPlaceholderText(/A-SPICE要件/), { target: { value: 'x' } })
+    fireEvent.change(screen.getByPlaceholderText('一覧表示用の短い説明'), { target: { value: 'y' } })
+    // READMEはフォーム内の唯一の textarea
+    const form = document.querySelector('form.card-panel') as HTMLElement
+    fireEvent.change(form.querySelector('textarea') as HTMLElement, { target: { value: '## t' } })
+    fireEvent.change(form.querySelector('input[type="url"]') as HTMLElement, {
+      target: { value: 'https://ex.com/' },
+    })
+  }
+
+  it('定量・定性効果 未入力で送信するとエラーが列挙される', () => {
+    renderAt('/tools/new')
+    fillFormExceptEffect()
+    fireEvent.click(screen.getByRole('button', { name: /この内容で登録/ }))
+    expect(screen.getByText(/入力に不備があります/)).toBeInTheDocument()
+    expect(screen.getByText(/定性効果は必須/)).toBeInTheDocument()
+    expect(screen.getByText(/定量効果.*必須/)).toBeInTheDocument()
+  })
+
+  it('定量効果 上限超え (745) はエラー', () => {
+    renderAt('/tools/new')
+    fillFormExceptEffect()
+    fireEvent.change(screen.getByPlaceholderText(/要件レビューの抜け漏れ/), {
+      target: { value: 'good' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('例: 20'), { target: { value: '745' } })
+    fireEvent.click(screen.getByRole('button', { name: /この内容で登録/ }))
+    expect(screen.getByText(/744 時間以下/)).toBeInTheDocument()
+  })
+
+  it('「その他」種別ではURL/zipなしでも登録できる', async () => {
+    renderAt('/tools/new')
+    // toolType を other に変更（フォーム内の唯一の select）
+    const form = document.querySelector('form.card-panel') as HTMLElement
+    fireEvent.change(form.querySelector('select.select') as HTMLElement, {
+      target: { value: 'other' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /メール処理/ }))
+    fireEvent.change(screen.getByPlaceholderText(/A-SPICE要件/), {
+      target: { value: 'その他ツール' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('一覧表示用の短い説明'), {
+      target: { value: '説明' },
+    })
+    fireEvent.change(form.querySelector('textarea') as HTMLElement, { target: { value: '## 内容' } })
+    fireEvent.change(screen.getByPlaceholderText(/要件レビューの抜け漏れ/), {
+      target: { value: '効果' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('例: 20'), { target: { value: '5' } })
+    fireEvent.click(screen.getByRole('button', { name: /この内容で登録/ }))
+    // 成功時は詳細ページに遷移してツール名が表示される
+    expect(await screen.findByText('その他ツール')).toBeInTheDocument()
+  })
+})
+
 describe('ツール登録ページの効果入力', () => {
   it('効果フィールド（定性・定量）が表示される', () => {
     renderAt('/tools/new')

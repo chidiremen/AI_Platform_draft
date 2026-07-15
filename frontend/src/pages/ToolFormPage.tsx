@@ -117,20 +117,70 @@ export default function ToolFormPage() {
     }
   }, [])
 
+  // 削減時間の上下限（月間）: 現実的な上限として 24h × 31日 = 744h をキャップに
+  const EFFECT_HOURS_MIN = 0
+  const EFFECT_HOURS_MAX = 744
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitError('')
-    if (toolType === 'zip_upload' && mode !== 'edit' && !zipFile) {
-      setSubmitError('zip種別の場合は zip ファイルを添付してください')
+
+    // ── 必須項目チェック（複数エラーをまとめて表示） ──
+    const errors: string[] = []
+    if (!title.trim()) errors.push('・ツール名は必須です')
+    if (!summary.trim()) errors.push('・概要説明は必須です')
+    if (!readme.trim()) errors.push('・README（説明）は必須です')
+
+    // 「その他」種別はURL/zip どちらも不要。それ以外は種別に応じて必須。
+    const needsUrlForType = toolType !== 'zip_upload' && toolType !== 'other'
+    const needsZipForType = toolType === 'zip_upload'
+    if (needsUrlForType && !accessUrl.trim()) {
+      errors.push('・アクセス先URLは必須です（種別が「その他」以外の場合）')
+    }
+    if (needsZipForType && mode !== 'edit' && !zipFile) {
+      errors.push('・zip種別の場合は zip ファイルを添付してください')
+    }
+
+    // 業務シーン or A-SPICE のどちらか
+    if (aspice.size === 0 && work.size === 0) {
+      errors.push('・業務シーンまたはA-SPICEプロセスを少なくとも1つ選択してください')
+    }
+
+    // 定性効果: 必須
+    if (!effectQualitative.trim()) {
+      errors.push('・定性効果は必須です（主観・自由記述でOK）')
+    }
+    // 定量効果: 必須 + 数値バリデーション
+    const rawHours = effectHours.trim()
+    let parsedHours: number | null = null
+    if (!rawHours) {
+      errors.push('・定量効果（月間削減時間）は必須です（主観でOK・0以上の数値）')
+    } else {
+      const n = Number(rawHours)
+      if (!Number.isFinite(n)) {
+        errors.push('・定量効果は数値で入力してください')
+      } else if (n < EFFECT_HOURS_MIN) {
+        errors.push(`・定量効果は ${EFFECT_HOURS_MIN} 以上で入力してください`)
+      } else if (n > EFFECT_HOURS_MAX) {
+        errors.push(
+          `・定量効果は月あたり ${EFFECT_HOURS_MAX} 時間以下で入力してください（24h×31日が上限目安）`,
+        )
+      } else {
+        parsedHours = n
+      }
+    }
+
+    if (errors.length > 0) {
+      setSubmitError('入力に不備があります：\n' + errors.join('\n'))
       return
     }
-    const parsedHours = effectHours.trim() ? parseFloat(effectHours) : null
+
     const input = {
-      title,
-      summary,
+      title: title.trim(),
+      summary: summary.trim(),
       readme,
       toolType,
-      accessUrl: accessUrl || undefined,
+      accessUrl: accessUrl.trim() || undefined,
       tags: tags
         .split(',')
         .map((t) => t.trim())
@@ -138,8 +188,8 @@ export default function ToolFormPage() {
       aspiceProcesses: [...aspice],
       workCategories: [...work],
       forkedFrom: mode === 'fork' ? source?.id : undefined,
-      effectQualitative: effectQualitative || undefined,
-      effectHoursPerMonth: parsedHours != null && !isNaN(parsedHours) ? parsedHours : null,
+      effectQualitative: effectQualitative.trim(),
+      effectHoursPerMonth: parsedHours,
       zipFile,
       newScreenshots: screenshots,
     }
@@ -162,8 +212,10 @@ export default function ToolFormPage() {
     }
   }
 
-  const needsUrl = toolType !== 'zip_upload'
+  // 「その他」種別は URL/zip どちらも不要。zip 種別のみ zip 必須。他は URL 必須。
+  const needsUrl = toolType !== 'zip_upload' && toolType !== 'other'
   const needsZip = toolType === 'zip_upload'
+  const optionalUrl = toolType === 'other' // 任意で URL 入力を許可
 
   const pageTitle =
     mode === 'edit' ? 'ツール編集' : mode === 'fork' ? 'フォークして改善版を登録' : 'ツール登録'
@@ -182,8 +234,19 @@ export default function ToolFormPage() {
       <p className="page-sub">
         AIツールの情報をプラットフォームに公開します。実体は各サービス側に置いたままで構いません。
       </p>
+      <div className="required-notice">
+        <strong>*</strong> は必須項目。
+        <span style={{ marginLeft: 12 }}>
+          <strong>必須</strong>: ツール名 / 概要 / URL または zip / README / 業務シーンまたはA-SPICE /
+          定性効果 / 定量効果
+        </span>
+        <br />
+        <span style={{ color: 'var(--text-dim)' }}>
+          種別が「その他」の場合は URL/zip 不要。定量効果は主観の見積もりで OK です（0〜{744}時間/月）
+        </span>
+      </div>
 
-      <form onSubmit={onSubmit} className="card-panel">
+      <form onSubmit={onSubmit} className="card-panel" noValidate>
         <div style={{ marginBottom: 18 }}>
           <label className="label">ツール名 *</label>
           <input
@@ -225,17 +288,23 @@ export default function ToolFormPage() {
           </select>
         </div>
 
-        {needsUrl && (
+        {(needsUrl || optionalUrl) && (
           <div style={{ marginBottom: 18 }}>
-            <label className="label">アクセス先URL *（zip以外は必須）</label>
+            <label className="label">
+              アクセス先URL {needsUrl ? '*' : '（任意）'}
+            </label>
             <input
               className="input"
               type="url"
-              required
               value={accessUrl}
               onChange={(e) => setAccessUrl(e.target.value)}
               placeholder="https://…"
             />
+            {optionalUrl && (
+              <div className="hint">
+                「その他」種別ではURL/zip どちらも任意です
+              </div>
+            )}
           </div>
         )}
 
@@ -386,35 +455,37 @@ export default function ToolFormPage() {
           />
         </div>
 
-        {/* 効果セクション */}
+        {/* 効果セクション（両方必須。集計に使うため主観でも数値必須） */}
         <fieldset className="effect-fieldset">
-          <legend className="label">効果（任意）</legend>
+          <legend className="label">効果 *</legend>
           <div style={{ marginBottom: 14 }}>
-            <label className="label-sub">定性効果</label>
+            <label className="label-sub">定性効果 *</label>
             <input
               className="input"
               value={effectQualitative}
               onChange={(e) => setEffectQualitative(e.target.value)}
               placeholder="例: 要件レビューの抜け漏れチェック工数が半減した"
             />
-            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
-              ツールの導入効果を自由記述してください
+            <div className="hint">
+              ツールの導入効果を自由記述してください（主観 OK）
             </div>
           </div>
           <div>
-            <label className="label-sub">定量効果: 月間削減時間（時間/月）</label>
+            <label className="label-sub">定量効果: 月間削減時間（時間/月） *</label>
             <input
               className="input"
               type="number"
-              min="0"
+              min={EFFECT_HOURS_MIN}
+              max={EFFECT_HOURS_MAX}
               step="0.5"
               value={effectHours}
               onChange={(e) => setEffectHours(e.target.value)}
               placeholder="例: 20"
               style={{ maxWidth: 200 }}
             />
-            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
-              自己申告ベース。月間の時間削減量を入力してください
+            <div className="hint">
+              主観の見積もりで OK。範囲: {EFFECT_HOURS_MIN}〜{EFFECT_HOURS_MAX} 時間/月
+              （24h×31日が上限目安）
             </div>
           </div>
         </fieldset>
@@ -442,11 +513,11 @@ export default function ToolFormPage() {
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={submitting || (aspice.size === 0 && work.size === 0)}
+            disabled={submitting}
             title={
-              aspice.size === 0 && work.size === 0
-                ? '業務シーンまたはA-SPICEプロセスを少なくとも1つ選択してください'
-                : undefined
+              submitting
+                ? '送信中'
+                : '必須項目チェックは送信時に行います'
             }
           >
             {submitting ? '送信中…' : submitLabel}

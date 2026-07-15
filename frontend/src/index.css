@@ -1242,6 +1242,21 @@ h3 {
   .col-8, .col-6, .col-4 { grid-column: span 12; }
 }
 
+/* ── ツール登録: 必須項目案内バナー ── */
+.required-notice {
+  padding: 10px 14px;
+  background: rgba(79, 157, 222, 0.08);
+  border-left: 3px solid var(--accent-bright);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 12px 0 18px;
+  line-height: 1.6;
+}
+.required-notice strong {
+  color: var(--danger);
+}
+
 /* ── 効果フィールドセット ── */
 .effect-fieldset {
   border: 1px solid var(--border-soft);
