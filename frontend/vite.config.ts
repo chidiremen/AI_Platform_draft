@@ -21,8 +21,10 @@ export default defineConfig(({ mode }) => {
   const frontendPort = Number(env.FRONTEND_PORT ?? '5174')
   const backendPort = env.BACKEND_PORT ?? '8009'
   const apiBase = env.VITE_API_BASE ?? `http://localhost:${backendPort}/api`
-  // 既定は「mock=true」＝ .env が無い/未指定でも動く安全側
-  const useMock = env.VITE_USE_MOCK ?? 'true'
+  // 既定は「mock=true」＝ .env が無い/未指定でも動く安全側。
+  // ただしテスト実行時は常に mock を強制する（バックエンド接続に依存させない）。
+  const isTest = mode === 'test' || process.env.VITEST === 'true'
+  const useMock = isTest ? 'true' : (env.VITE_USE_MOCK ?? 'true')
 
   return {
     plugins: [react()],

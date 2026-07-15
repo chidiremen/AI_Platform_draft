@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApp } from '../store'
 import ToolCard from '../components/ToolCard'
+import ProfilePanel from '../components/ProfilePanel'
 
-type Tab = 'mine' | 'liked' | 'requests' | 'incoming' | 'notifications'
+type Tab = 'mine' | 'liked' | 'requests' | 'incoming' | 'notifications' | 'profile'
 
 const STATUS_LABEL: Record<string, string> = {
   pending: '申請中',
@@ -91,6 +92,12 @@ export default function MyPage() {
           onClick={() => setTab('incoming')}
         >
           自分のツールへの被申請（{incoming.length}）
+        </button>
+        <button
+          className={`tab ${tab === 'profile' ? 'active' : ''}`}
+          onClick={() => setTab('profile')}
+        >
+          ⚙️ プロフィール
         </button>
       </div>
 
@@ -358,6 +365,8 @@ export default function MyPage() {
           )}
         </div>
       )}
+
+      {tab === 'profile' && <ProfilePanel />}
     </div>
   )
 }

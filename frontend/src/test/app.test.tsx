@@ -558,6 +558,32 @@ describe('申請モーダル: 種別に応じた入力欄', () => {
   })
 })
 
+describe('マイページ: プロフィールタブ', () => {
+  it('プロフィールタブから表示名を更新でき、ヘッダーに反映される', async () => {
+    renderAt('/mypage')
+    fireEvent.click(screen.getByRole('button', { name: /⚙️ プロフィール/ }))
+    // 名前入力を変更
+    const nameInput = screen.getByDisplayValue('田中太郎')
+    fireEvent.change(nameInput, { target: { value: '田中太郎（マイページ経由）' } })
+    fireEvent.click(screen.getByRole('button', { name: /変更を保存/ }))
+    // ヘッダーのユーザー名リンクに反映
+    expect(
+      await screen.findByRole('link', { name: '田中太郎（マイページ経由）' }),
+    ).toBeInTheDocument()
+  })
+
+  it('プロフィールタブからパスワードを変更できる', async () => {
+    renderAt('/mypage')
+    fireEvent.click(screen.getByRole('button', { name: /⚙️ プロフィール/ }))
+    const pws = document.querySelectorAll('input[type="password"]')
+    fireEvent.change(pws[0], { target: { value: 'password' } })
+    fireEvent.change(pws[1], { target: { value: 'newpassword' } })
+    fireEvent.change(pws[2], { target: { value: 'newpassword' } })
+    fireEvent.click(screen.getByRole('button', { name: /パスワードを変更/ }))
+    expect(await screen.findByText(/パスワードを更新しました/)).toBeInTheDocument()
+  })
+})
+
 describe('モックモード: 永続化（リロード耐性）', () => {
   it('投稿したコメントが localStorage に保存される', () => {
     renderAt('/tools/1')
