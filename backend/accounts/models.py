@@ -12,11 +12,16 @@ class User(AbstractUser):
     """
 
     class Role(models.TextChoices):
-        ADMIN = "admin", "管理者"
+        ADMIN = "admin", "組織管理者"
+        TOOL_ADMIN = "tool_admin", "ツール管理者"
         MEMBER = "member", "メンバー"
 
+    # 管理者権限を持つロールの集合（ADMIN / TOOL_ADMIN）。
+    # 追加のロールを増やすときはここに列挙するだけで済むように定数化。
+    ADMIN_ROLES = frozenset({Role.ADMIN, Role.TOOL_ADMIN})
+
     role = models.CharField(
-        max_length=10,
+        max_length=16,  # 'tool_admin' が入るよう拡張
         choices=Role.choices,
         default=Role.MEMBER,
     )
@@ -24,7 +29,7 @@ class User(AbstractUser):
 
     @property
     def is_admin_role(self) -> bool:
-        return self.role == self.Role.ADMIN
+        return self.role in self.ADMIN_ROLES
 
     def save(self, *args, **kwargs):
         # Keep the application role and Django admin flags consistent in both
@@ -32,9 +37,9 @@ class User(AbstractUser):
         #   - A Django superuser (e.g. created via ``createsuperuser``) is
         #     always treated as an application admin.
         #   - An admin-role user gets the Django admin flags as a convenience.
-        if self.is_superuser:
+        if self.is_superuser and self.role not in self.ADMIN_ROLES:
             self.role = self.Role.ADMIN
-        if self.role == self.Role.ADMIN:
+        if self.role in self.ADMIN_ROLES:
             self.is_staff = True
             self.is_superuser = True
         super().save(*args, **kwargs)

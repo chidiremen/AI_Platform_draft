@@ -73,6 +73,38 @@ class MemberRoleTests(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
 
+class ToolAdminRoleTests(APITestCase):
+    """ツール管理者 (tool_admin) が組織管理者 (admin) と同等の権限を持つこと。"""
+
+    def setUp(self):
+        self.tool_admin = User.objects.create_user(
+            username="ta", password="pw", role="tool_admin", display_name="TA"
+        )
+        self.member = User.objects.create_user(
+            username="m2", password="pw", role="member"
+        )
+
+    def test_tool_admin_reports_role_as_tool_admin(self):
+        res = token_client(self.tool_admin).get("/api/me/")
+        self.assertEqual(res.data["role"], "tool_admin")
+
+    def test_tool_admin_can_access_admin_users_endpoint(self):
+        res = token_client(self.tool_admin).get("/api/admin/users/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_tool_admin_can_delete_another_user(self):
+        res = token_client(self.tool_admin).delete(
+            f"/api/admin/users/{self.member.id}/"
+        )
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_tool_admin_gets_django_admin_flags(self):
+        # 保存時に is_staff / is_superuser が同期される
+        self.tool_admin.refresh_from_db()
+        self.assertTrue(self.tool_admin.is_staff)
+        self.assertTrue(self.tool_admin.is_superuser)
+
+
 class AdminUserEditDeleteTests(APITestCase):
     """管理者によるユーザー編集（表示名/メール/ロール/PWリセット）と削除。"""
 

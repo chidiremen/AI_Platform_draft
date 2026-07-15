@@ -10,7 +10,7 @@ import {
 import type { ReactNode } from 'react'
 import type { CommentType, Tool, ToolComment } from './types'
 import { MOCK_TOOLS } from './data/tools'
-import { MOCK_USERS, type Role, type User } from './data/users'
+import { MOCK_USERS, isAdminRole, type Role, type User } from './data/users'
 import { USE_MOCK } from './config'
 import * as api from './api'
 
@@ -279,7 +279,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       for (const r of incoming) byId.set(r.id, r) // author 入りで上書き
       setRequests([...byId.values()])
       setIncomingComments(incomingCmts)
-      if (me.role === 'admin') {
+      if (isAdminRole(me.role)) {
         try {
           setUsers(await api.listUsers())
         } catch {
@@ -577,7 +577,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ── 権限 ──
   const canEdit = useCallback(
     (tool: Tool) =>
-      !!currentUser && (currentUser.role === 'admin' || tool.author === currentUser.name),
+      !!currentUser && (isAdminRole(currentUser.role) || tool.author === currentUser.name),
     [currentUser],
   )
 
@@ -941,7 +941,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const canDeleteComment = useCallback(
     (comment: ToolComment) =>
       !!currentUser &&
-      (currentUser.role === 'admin' || comment.author === currentUser.name),
+      (isAdminRole(currentUser.role) || comment.author === currentUser.name),
     [currentUser],
   )
 

@@ -22,6 +22,7 @@ import * as api from '../api'
 import { ASPICE_PROCESSES, CATEGORY_COLORS } from '../data/aspice'
 import { TOOL_TYPES, TOOL_TYPE_MAP } from '../data/toolTypes'
 import { WORK_CATEGORIES } from '../data/workCategories'
+import { isAdminRole } from '../data/users'
 
 const FUNNEL_PALETTE = ['#3a8dde', '#41c7b9', '#b88ad6', '#e0a458', '#e07a8b']
 
@@ -38,7 +39,7 @@ const tooltipStyle = {
 
 export default function DashboardPage() {
   const { tools: allTools, currentUser, mode } = useApp()
-  const isAdmin = currentUser?.role === 'admin'
+  const isAdmin = isAdminRole(currentUser?.role)
 
   // 権限によるスコープ：管理者は全ツール、メンバーは自分が登録したツールのみ
   const tools = useMemo(

@@ -1153,6 +1153,10 @@ h3 {
   background: rgba(240, 201, 135, 0.18);
   color: var(--amber);
 }
+.role-tool_admin {
+  background: rgba(184, 138, 214, 0.18);
+  color: var(--purple);
+}
 .role-member {
   background: rgba(79, 157, 222, 0.16);
   color: var(--accent-bright);
@@ -1565,6 +1569,11 @@ button.shot {
   background: rgba(79, 157, 222, 0.15);
   color: var(--accent-bright);
   border-color: var(--accent-bright);
+}
+.role-badge.role-tool_admin {
+  background: rgba(184, 138, 214, 0.15);
+  color: var(--purple);
+  border-color: var(--purple);
 }
 .role-badge.role-member {
   background: rgba(159, 177, 204, 0.1);

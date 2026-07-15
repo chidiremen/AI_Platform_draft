@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { useApp } from '../store'
+import { ROLE_LABELS, isAdminRole } from '../data/users'
 
 export default function Header() {
   const navigate = useNavigate()
@@ -21,7 +22,10 @@ export default function Header() {
     navigate(`/?${params.toString()}`)
   }
 
-  const isAdmin = currentUser?.role === 'admin'
+  const isAdmin = isAdminRole(currentUser?.role)
+  const roleLabel = currentUser
+    ? ROLE_LABELS[currentUser.role] ?? currentUser.role
+    : ''
 
   return (
     <header className="header">
@@ -63,7 +67,7 @@ export default function Header() {
               {currentUser?.name}
             </Link>
             <span className={`role-pill role-${currentUser?.role}`}>
-              {isAdmin ? '管理者' : 'メンバー'}
+              {roleLabel}
             </span>
             <button
               className="btn-ghost-link"

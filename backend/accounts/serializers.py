@@ -26,7 +26,12 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "date_joined"]
 
     def get_role(self, obj) -> str:
-        if obj.is_superuser or obj.role == User.Role.ADMIN:
+        # Django の superuser フラグは application role が admin/tool_admin
+        # どちらでも許容する。member だった場合のみ admin に正規化する
+        # （既存 createsuperuser 由来の stale レコード対策）。
+        if obj.role in User.ADMIN_ROLES:
+            return obj.role
+        if obj.is_superuser:
             return User.Role.ADMIN
         return obj.role
 

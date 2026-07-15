@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useApp } from '../store'
 import ToolCard from '../components/ToolCard'
 import ProfilePanel from '../components/ProfilePanel'
+import { ROLE_LABELS } from '../data/users'
 
 type Tab = 'mine' | 'liked' | 'requests' | 'incoming' | 'notifications' | 'profile'
 
@@ -65,7 +66,7 @@ export default function MyPage() {
       <h1 className="page-title">マイページ</h1>
       <p className="page-sub">
         ログイン中: <strong>{myName}</strong>（
-        {currentUser?.role === 'admin' ? '組織管理者' : 'メンバー'}）
+        {currentUser ? ROLE_LABELS[currentUser.role] ?? currentUser.role : ''}）
       </p>
 
       <div className="tabs">

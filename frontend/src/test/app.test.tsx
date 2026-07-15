@@ -584,6 +584,45 @@ describe('マイページ: プロフィールタブ', () => {
   })
 })
 
+describe('ロール: ツール管理者 (tool_admin)', () => {
+  it('ツール管理者（佐藤一郎）は管理者ページにアクセスできる', () => {
+    seedSession('sato')
+    renderAt('/admin/users')
+    // アクセス許可されている → ユーザー初期登録の見出しが表示される
+    expect(screen.getByText('ユーザー初期登録')).toBeInTheDocument()
+  })
+
+  it('ツール管理者はヘッダーに「ツール管理者」ロールが表示される', () => {
+    seedSession('sato')
+    renderAt('/')
+    // 複数箇所に出る可能性があるので getAllByText を使う
+    expect(screen.getAllByText('ツール管理者').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('ツール管理者は他人のツールを削除できる（canEdit）', () => {
+    seedSession('sato')
+    renderAt('/tools/1') // tool 1 は tanaka の登録
+    // サイドバーの編集・削除ボタンが出る
+    expect(screen.getByRole('button', { name: /編集（再投稿）/ })).toBeInTheDocument()
+    expect(document.querySelector('.detail-side .btn-danger')).not.toBeNull()
+  })
+
+  it('ユーザー編集モーダルの role セレクタに3つ全て並ぶ', () => {
+    renderAt('/admin/users')
+    // 田中太郎の編集モーダルを開く
+    const table = document.querySelector('.data-table') as HTMLElement
+    const row = within(table).getByText('鈴木花子').closest('tr') as HTMLElement
+    fireEvent.click(within(row).getByRole('button', { name: /✏️ 編集/ }))
+    // モーダル内のロールセレクタ
+    const modalSelect = document.querySelectorAll('.modal .select')
+    const roleSelect = modalSelect[modalSelect.length - 1] as HTMLSelectElement
+    const optionValues = Array.from(roleSelect.options).map((o) => o.value)
+    expect(optionValues).toContain('member')
+    expect(optionValues).toContain('tool_admin')
+    expect(optionValues).toContain('admin')
+  })
+})
+
 describe('モックモード: 永続化（リロード耐性）', () => {
   it('投稿したコメントが localStorage に保存される', () => {
     renderAt('/tools/1')

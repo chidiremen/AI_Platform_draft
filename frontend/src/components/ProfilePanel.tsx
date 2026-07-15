@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../store'
+import { ROLE_LABELS } from '../data/users'
 
 /**
  * ログイン中ユーザー本人のプロフィール編集パネル。
@@ -69,7 +70,7 @@ function ProfileForm({ initial, loginId, role, onSubmit }: ProfileFormProps) {
       <label className="label">ロール</label>
       <input
         className="input"
-        value={role === 'admin' ? '組織管理者' : 'メンバー'}
+        value={ROLE_LABELS[role as keyof typeof ROLE_LABELS] ?? role}
         disabled
       />
       <div className="hint">ロール変更は管理者にご依頼ください</div>

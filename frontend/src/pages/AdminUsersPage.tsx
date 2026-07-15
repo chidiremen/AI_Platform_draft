@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useApp } from '../store'
 import ConfirmModal from '../components/ConfirmModal'
-import type { Role, User } from '../data/users'
+import { ROLE_LABELS, isAdminRole, type Role, type User } from '../data/users'
 
 export default function AdminUsersPage() {
   const {
@@ -27,7 +27,7 @@ export default function AdminUsersPage() {
   const [deletingUser, setDeletingUser] = useState<User | null>(null)
 
   // 管理者以外はアクセス不可
-  if (!currentUser || currentUser.role !== 'admin') {
+  if (!currentUser || !isAdminRole(currentUser.role)) {
     return <Navigate to="/" replace />
   }
 
@@ -84,8 +84,9 @@ export default function AdminUsersPage() {
             <div style={{ height: 12 }} />
             <label className="label">ロール</label>
             <select className="select" value={role} onChange={(e) => setRole(e.target.value as Role)}>
-              <option value="member">メンバー</option>
-              <option value="admin">組織管理者</option>
+              <option value="member">{ROLE_LABELS.member}</option>
+              <option value="tool_admin">{ROLE_LABELS.tool_admin}</option>
+              <option value="admin">{ROLE_LABELS.admin}</option>
             </select>
 
             {formError && <div className="login-error">{formError}</div>}
@@ -125,7 +126,7 @@ export default function AdminUsersPage() {
                     <td>{toolCount(u.name)} 件</td>
                     <td>
                       <span className={`role-badge role-${u.role}`}>
-                        {u.role === 'admin' ? '組織管理者' : 'メンバー'}
+                        {ROLE_LABELS[u.role] ?? u.role}
                       </span>
                     </td>
                     <td>
@@ -250,8 +251,9 @@ function EditUserModal({ user, onClose, onSubmit }: EditModalProps) {
           <div style={{ height: 12 }} />
           <label className="label">ロール</label>
           <select className="select" value={role} onChange={(e) => setRole(e.target.value as Role)}>
-            <option value="member">メンバー</option>
-            <option value="admin">組織管理者</option>
+            <option value="member">{ROLE_LABELS.member}</option>
+            <option value="tool_admin">{ROLE_LABELS.tool_admin}</option>
+            <option value="admin">{ROLE_LABELS.admin}</option>
           </select>
           <div style={{ height: 12 }} />
           <label className="label">新しいパスワード（変更する場合のみ）</label>

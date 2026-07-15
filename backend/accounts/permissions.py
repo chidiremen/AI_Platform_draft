@@ -3,11 +3,16 @@
 from rest_framework import permissions
 
 
+#: 管理者権限を持つ role 値の集合。組織管理者 (admin) とツール管理者
+#: (tool_admin) は同等の権限として扱う。
+ADMIN_ROLES = frozenset({"admin", "tool_admin"})
+
+
 def is_admin(user) -> bool:
     return bool(
         user
         and user.is_authenticated
-        and (getattr(user, "role", None) == "admin" or user.is_superuser)
+        and (getattr(user, "role", None) in ADMIN_ROLES or user.is_superuser)
     )
 
 
