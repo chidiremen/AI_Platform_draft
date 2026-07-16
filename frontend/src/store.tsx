@@ -740,6 +740,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const recordDownload = useCallback(
     (tool: Tool) => {
+      // 楽観的にローカルカウントを +1（すぐUIに反映）
       setTools((ts) =>
         ts.map((t) => (t.id === tool.id ? { ...t, downloads: (t.downloads ?? 0) + 1 } : t)),
       )
@@ -747,10 +748,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const filename = tool.zipFileName || `${tool.title}.zip`
         api
           .downloadZip(tool.id, filename)
-          .then(() => api.postActivity([{ tool: tool.id, action: 'download' }]))
-          .catch((e) =>
-            toast(`📥 ダウンロードに失敗しました: ${e instanceof Error ? e.message : ''}`),
-          )
+          .then(async () => {
+            // backend の /download/ 内で ActivityLog を記録するので postActivity 不要
+            // （二重計上を避けるため）。少し待ってからサーバ側の真値で reconcile。
+            try {
+              const fresh = await api.getTool(tool.id)
+              setTools((ts) => ts.map((t) => (t.id === tool.id ? fresh : t)))
+            } catch {
+              /* 取得失敗は楽観値のまま */
+            }
+          })
+          .catch((e) => {
+            // 失敗時はローカルの楽観 +1 を戻す
+            setTools((ts) =>
+              ts.map((t) =>
+                t.id === tool.id
+                  ? { ...t, downloads: Math.max(0, (t.downloads ?? 1) - 1) }
+                  : t,
+              ),
+            )
+            toast(`📥 ダウンロードに失敗しました: ${e instanceof Error ? e.message : ''}`)
+          })
       } else {
         toast('📥 ダウンロードを開始しました（デモ）')
       }

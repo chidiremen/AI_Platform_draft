@@ -167,6 +167,9 @@ interface ToolDTO {
   screenshots?: ScreenshotDTO[]
   like_count: number
   request_count: number
+  download_count?: number
+  view_count?: number
+  impression_count?: number
   liked_by_me: boolean
   created_at: string
   updated_at: string
@@ -224,11 +227,16 @@ export function mapTool(d: ToolDTO): Tool {
       d.effect_hours_per_month != null ? Number(d.effect_hours_per_month) : undefined,
     likes: d.like_count ?? 0,
     accessRequests: d.request_count ?? 0,
-    // 注: 閲覧/インプレッション/DL の per-tool カウントは一覧シリアライザに含まれない
-    // （ActivityLog 集計のため）。一覧では 0 起点とし、集計は dashboard API を使う。
-    views: 0,
-    impressions: 0,
-    downloads: d.tool_type === 'zip_upload' ? 0 : undefined,
+    // per-tool 閲覧/インプレッション/DL は ActivityLog 集計。
+    // download/view/impression_count がシリアライザに含まれるようになったのでそれを使う。
+    views: d.view_count ?? 0,
+    impressions: d.impression_count ?? 0,
+    downloads:
+      d.download_count != null
+        ? d.download_count
+        : d.tool_type === 'zip_upload'
+          ? 0
+          : undefined,
   }
 }
 

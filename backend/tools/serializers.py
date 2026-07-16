@@ -73,6 +73,11 @@ class ToolSerializer(serializers.ModelSerializer):
     screenshots = ScreenshotSerializer(many=True, read_only=True)
     like_count = serializers.SerializerMethodField()
     request_count = serializers.SerializerMethodField()
+    # ActivityLog を集計したダウンロード/閲覧/インプレッション数。
+    # 永続化されているのはActivityLogレコードのみで、Toolテーブルには持たない。
+    download_count = serializers.SerializerMethodField()
+    view_count = serializers.SerializerMethodField()
+    impression_count = serializers.SerializerMethodField()
     liked_by_me = serializers.SerializerMethodField()
     zip_file_name = serializers.SerializerMethodField()
 
@@ -97,6 +102,9 @@ class ToolSerializer(serializers.ModelSerializer):
             "screenshots",
             "like_count",
             "request_count",
+            "download_count",
+            "view_count",
+            "impression_count",
             "liked_by_me",
             "created_at",
             "updated_at",
@@ -114,6 +122,19 @@ class ToolSerializer(serializers.ModelSerializer):
 
     def get_request_count(self, obj) -> int:
         return obj.access_requests.count()
+
+    def _activity_count(self, obj, action: str) -> int:
+        # related_name="activity_logs" for ActivityLog.tool
+        return obj.activity_logs.filter(action=action).count()
+
+    def get_download_count(self, obj) -> int:
+        return self._activity_count(obj, "download")
+
+    def get_view_count(self, obj) -> int:
+        return self._activity_count(obj, "view")
+
+    def get_impression_count(self, obj) -> int:
+        return self._activity_count(obj, "impression")
 
     def get_liked_by_me(self, obj) -> bool:
         request = self.context.get("request")

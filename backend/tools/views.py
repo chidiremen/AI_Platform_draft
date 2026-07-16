@@ -98,6 +98,14 @@ class ToolViewSet(ModelViewSet):
                     distinct=True,
                 )
             ).order_by("-_n", "-created_at")
+        elif sort == "downloads":
+            qs = qs.annotate(
+                _n=Count(
+                    "activity_logs",
+                    filter=Q(activity_logs__action="download"),
+                    distinct=True,
+                )
+            ).order_by("-_n", "-created_at")
         elif sort == "name":
             qs = qs.order_by("title")
         else:  # newest
@@ -179,6 +187,17 @@ class ToolViewSet(ModelViewSet):
         tool = self.get_object()
         if not tool.zip_file:
             raise Http404("このツールにはダウンロード可能なファイルがありません。")
+        # ダウンロード数の真の情報源はActivityLog。フロント側の postActivity
+        # 呼び忘れや失敗があってもカウントが正しくなるよう、ここでも1件記録する。
+        try:
+            from metrics.models import ActivityLog
+            ActivityLog.objects.create(
+                user=request.user if request.user.is_authenticated else None,
+                tool=tool,
+                action=ActivityLog.Action.DOWNLOAD,
+            )
+        except Exception:  # pragma: no cover - 計測失敗はDL自体を止めない
+            pass
         return FileResponse(
             tool.zip_file.open("rb"),
             as_attachment=True,

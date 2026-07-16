@@ -290,6 +290,28 @@ class MultipartAndFileTests(APITestCase):
         # FileResponse のヘッダ
         self.assertIn("attachment", res.headers.get("Content-Disposition", ""))
 
+    def test_download_endpoint_increments_download_count(self):
+        """ダウンロード数は ActivityLog を集計。/download/ が自動記録し、
+        後続の /tools/{id}/ で download_count が返ってくる。"""
+        from metrics.models import ActivityLog
+        tool = Tool.objects.create(
+            title="t", summary="s", readme="r", tool_type="zip_upload", author=self.author
+        )
+        tool.zip_file.save("a.zip", BytesIO(b"PKzipdata"), save=True)
+        client = self._auth_client(self.author)
+        # 初期値
+        res = client.get(f"/api/tools/{tool.id}/")
+        self.assertEqual(res.data["download_count"], 0)
+        # ダウンロードを2回
+        client.get(f"/api/tools/{tool.id}/download/")
+        client.get(f"/api/tools/{tool.id}/download/")
+        self.assertEqual(
+            ActivityLog.objects.filter(tool=tool, action="download").count(), 2
+        )
+        # 詳細取得時に反映されている
+        res = client.get(f"/api/tools/{tool.id}/")
+        self.assertEqual(res.data["download_count"], 2)
+
 
 class AccessRequestResolveTests(APITestCase):
     def setUp(self):
