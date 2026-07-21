@@ -4,6 +4,8 @@ import DocsSidebar from '../components/DocsSidebar'
 import MarkdownView from '../components/MarkdownView'
 import MarkdownEditor from '../components/MarkdownEditor'
 import ConfirmModal from '../components/ConfirmModal'
+import QuestionFormModal from '../components/QuestionFormModal'
+import AnswerFormModal from '../components/AnswerFormModal'
 import { useDocsStore } from '../hooks/useDocs'
 import { useApp } from '../store'
 import type { Question } from '../types'
@@ -18,9 +20,10 @@ import type { Question } from '../types'
 export default function QAPage() {
   const { id, action } = useParams<{ id?: string; action?: string }>()
   const store = useDocsStore()
-  const { categories, questions } = store
+  const { categories, questions, addQuestion } = store
   const navigate = useNavigate()
   const [search] = useSearchParams()
+  const [askOpen, setAskOpen] = useState(false)
 
   const qaCategories = useMemo(
     () => categories.filter((c) => c.kind === 'qa'),
@@ -48,7 +51,7 @@ export default function QAPage() {
     <button
       type="button"
       className="btn btn-primary btn-sm"
-      onClick={() => navigate('/qa/new')}
+      onClick={() => setAskOpen(true)}
     >
       ❓ 質問する
     </button>
@@ -88,16 +91,26 @@ export default function QAPage() {
         ) : activeQuestion ? (
           <QuestionDetail questionId={activeQuestion.id} />
         ) : (
-          <QuestionList />
+          <QuestionList onAskClick={() => setAskOpen(true)} />
         )}
       </main>
+      {askOpen && (
+        <QuestionFormModal
+          categories={qaCategories}
+          onSubmit={async (input) => {
+            const newId = await addQuestion(input)
+            navigate(`/qa/${newId}`)
+          }}
+          onClose={() => setAskOpen(false)}
+        />
+      )}
     </div>
   )
 }
 
 // ────── 一覧 ──────
 
-function QuestionList() {
+function QuestionList({ onAskClick }: { onAskClick: () => void }) {
   const store = useDocsStore()
   const { questions, categories } = store
   const { currentUser } = useApp()
@@ -163,6 +176,9 @@ function QuestionList() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
+        <button className="btn btn-primary" onClick={onAskClick}>
+          ❓ 質問する
+        </button>
       </div>
 
       <div className="qa-list">
@@ -213,6 +229,7 @@ function QuestionDetail({ questionId }: { questionId: string }) {
   const store = useDocsStore()
   const { currentUser } = useApp()
   const {
+    categories,
     questions,
     isAdmin,
     addAnswer,
@@ -220,18 +237,23 @@ function QuestionDetail({ questionId }: { questionId: string }) {
     deleteAnswer,
     acceptAnswer,
     deleteQuestion,
+    updateQuestion,
     toggleResolved,
   } = store
   const navigate = useNavigate()
   const q = questions.find((x) => x.id === questionId)!
-  const [newAnswer, setNewAnswer] = useState('')
+  // モーダル状態
+  const [answerOpen, setAnswerOpen] = useState(false)
   const [editingAnswerId, setEditingAnswerId] = useState<string | null>(null)
-  const [editingBody, setEditingBody] = useState('')
+  const [editQuestionOpen, setEditQuestionOpen] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
 
   const canEditQuestion = isAdmin || q.asker === currentUser?.name
   const canAcceptAnswer = isAdmin || q.asker === currentUser?.name
   const canEditAnswer = (aAuthor: string) => isAdmin || aAuthor === currentUser?.name
+  const editingAnswer = editingAnswerId
+    ? (q.answers ?? []).find((a) => a.id === editingAnswerId)
+    : undefined
 
   return (
     <div className="qa-detail">
@@ -265,7 +287,7 @@ function QuestionDetail({ questionId }: { questionId: string }) {
 
       {canEditQuestion && (
         <div className="guide-actions">
-          <button className="btn btn-sm" onClick={() => navigate(`/qa/${q.id}/edit`)}>
+          <button className="btn btn-sm" onClick={() => setEditQuestionOpen(true)}>
             ✏️ 編集
           </button>
           <button
@@ -290,32 +312,9 @@ function QuestionDetail({ questionId }: { questionId: string }) {
               <span>by <strong>{a.author}</strong></span>
               <span className="dim">{a.createdAt.slice(0, 10)}</span>
             </div>
-            {editingAnswerId === a.id ? (
-              <>
-                <MarkdownEditor value={editingBody} onChange={setEditingBody} rows={8} />
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => setEditingAnswerId(null)}
-                  >
-                    キャンセル
-                  </button>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={async () => {
-                      await updateAnswer(q.id, a.id, editingBody)
-                      setEditingAnswerId(null)
-                    }}
-                  >
-                    更新
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="card-panel">
-                <MarkdownView source={a.body} />
-              </div>
-            )}
+            <div className="card-panel">
+              <MarkdownView source={a.body} />
+            </div>
             <div className="qa-answer-actions">
               {canAcceptAnswer && (
                 <button
@@ -325,14 +324,11 @@ function QuestionDetail({ questionId }: { questionId: string }) {
                   {a.isAccepted ? '✅ ベストアンサー' : '☆ ベストにする'}
                 </button>
               )}
-              {canEditAnswer(a.author) && editingAnswerId !== a.id && (
+              {canEditAnswer(a.author) && (
                 <>
                   <button
                     className="btn btn-sm"
-                    onClick={() => {
-                      setEditingAnswerId(a.id)
-                      setEditingBody(a.body)
-                    }}
+                    onClick={() => setEditingAnswerId(a.id)}
                   >
                     ✏️ 編集
                   </button>
@@ -353,30 +349,50 @@ function QuestionDetail({ questionId }: { questionId: string }) {
       </div>
 
       {isAdmin ? (
-        <div className="qa-answer-form">
-          <h3>✍️ 回答を投稿</h3>
-          <MarkdownEditor
-            value={newAnswer}
-            onChange={setNewAnswer}
-            placeholder="Markdown で回答を記入"
-          />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-            <button
-              className="btn btn-primary"
-              disabled={!newAnswer.trim()}
-              onClick={async () => {
-                await addAnswer(q.id, newAnswer)
-                setNewAnswer('')
-              }}
-            >
-              回答を投稿
-            </button>
-          </div>
+        <div className="qa-answer-cta">
+          <button className="btn btn-primary btn-lg" onClick={() => setAnswerOpen(true)}>
+            ✍️ 回答を投稿
+          </button>
         </div>
       ) : (
         <div className="qa-answer-note">
           回答の投稿は「ツール管理者 / 組織管理者」ロールのユーザーのみ可能です。
         </div>
+      )}
+
+      {/* 回答投稿モーダル (新規) */}
+      {answerOpen && (
+        <AnswerFormModal
+          questionTitle={q.title}
+          onSubmit={async (body) => {
+            await addAnswer(q.id, body)
+          }}
+          onClose={() => setAnswerOpen(false)}
+        />
+      )}
+
+      {/* 回答編集モーダル */}
+      {editingAnswer && (
+        <AnswerFormModal
+          questionTitle={q.title}
+          initialBody={editingAnswer.body}
+          onSubmit={async (body) => {
+            await updateAnswer(q.id, editingAnswer.id, body)
+          }}
+          onClose={() => setEditingAnswerId(null)}
+        />
+      )}
+
+      {/* 質問編集モーダル */}
+      {editQuestionOpen && (
+        <QuestionFormModal
+          initial={q}
+          categories={categories}
+          onSubmit={async (input) => {
+            await updateQuestion(q.id, input)
+          }}
+          onClose={() => setEditQuestionOpen(false)}
+        />
       )}
 
       {showDelete && (

@@ -809,22 +809,50 @@ describe('Q&A', () => {
     ).toBeInTheDocument()
   })
 
-  it('組織管理者は回答フォームが表示される', () => {
+  it('組織管理者は回答投稿ボタンが表示される', () => {
     seedSession('tanaka')
     renderAt('/qa/q3')
+    // モーダルを開く CTA ボタン
     expect(
-      screen.getByRole('heading', { name: /回答を投稿/ }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: '回答を投稿' }),
+      screen.getByRole('button', { name: /✍️ 回答を投稿/ }),
     ).toBeInTheDocument()
   })
 
-  it('ツール管理者(佐藤一郎)も回答フォームが表示される', () => {
+  it('回答投稿ボタンをクリックすると回答モーダルが開く', () => {
+    seedSession('tanaka')
+    renderAt('/qa/q3')
+    fireEvent.click(screen.getByRole('button', { name: /✍️ 回答を投稿/ }))
+    // モーダル内のフォーム
+    expect(
+      screen.getByRole('heading', { name: /✍️ 回答を投稿/ }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/対象:/)).toBeInTheDocument()
+    // 送信ボタン (モーダル内)
+    expect(
+      screen.getByRole('button', { name: /投稿する/ }),
+    ).toBeInTheDocument()
+  })
+
+  it('質問するボタンで質問モーダルが開く', () => {
+    seedSession('suzuki')
+    renderAt('/qa')
+    // ツールバーの「❓ 質問する」ボタン (getAllByで複数ヒットを許容)
+    const askBtns = screen.getAllByRole('button', { name: /❓ 質問する/ })
+    fireEvent.click(askBtns[0])
+    // モーダル内フォーム
+    expect(
+      screen.getByRole('heading', { name: /❓ 質問を投稿/ }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByPlaceholderText(/xxx の使い方が分かりません/),
+    ).toBeInTheDocument()
+  })
+
+  it('ツール管理者(佐藤一郎)にも回答投稿ボタンが表示される', () => {
     seedSession('sato')
     renderAt('/qa/q3')
     expect(
-      screen.getByRole('heading', { name: /回答を投稿/ }),
+      screen.getByRole('button', { name: /✍️ 回答を投稿/ }),
     ).toBeInTheDocument()
   })
 })
