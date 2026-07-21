@@ -721,3 +721,110 @@ describe('モックモード: 永続化（リロード耐性）', () => {
     expect(raw!).toContain('永続化テスト')
   })
 })
+
+describe('ガイド (docs)', () => {
+  it('ガイドランディングにカテゴリ別カードが並ぶ', () => {
+    renderAt('/guide')
+    expect(
+      screen.getByRole('heading', { name: /📚 プラットフォーム ガイド/ }),
+    ).toBeInTheDocument()
+    // シード済カテゴリの見出し
+    expect(screen.getByRole('heading', { name: /はじめに/ })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: /ツール登録/ }),
+    ).toBeInTheDocument()
+  })
+
+  it('スラッグからガイド詳細が開ける', () => {
+    renderAt('/guide/welcome')
+    expect(
+      screen.getByRole('heading', { name: 'AIツールカタログへようこそ' }),
+    ).toBeInTheDocument()
+  })
+
+  it('メンバーは新規ガイド作成できない (redirect)', () => {
+    seedSession('suzuki')
+    renderAt('/guide/new')
+    // リダイレクトされるので新規ガイドフォームが出ない
+    expect(screen.queryByText(/新規ガイド/)).not.toBeInTheDocument()
+  })
+
+  it('管理者は新規ガイドフォームを開ける', () => {
+    seedSession('tanaka')
+    renderAt('/guide/new')
+    expect(
+      screen.getByRole('heading', { name: /新規ガイド/ }),
+    ).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/ツール登録の手順/)).toBeInTheDocument()
+  })
+})
+
+describe('Q&A', () => {
+  it('Q&A 一覧に既存質問が並ぶ', () => {
+    renderAt('/qa')
+    expect(screen.getByRole('heading', { name: '💬 Q&A' })).toBeInTheDocument()
+    expect(
+      screen.getByText('ツール登録時に「効果」欄は何を書けばいいですか？'),
+    ).toBeInTheDocument()
+  })
+
+  it('検索で質問がフィルタされる', () => {
+    renderAt('/qa')
+    const input = screen.getByPlaceholderText(/タイトル・本文・タグを検索/)
+    fireEvent.change(input, { target: { value: 'ダウンロード' } })
+    // 該当する質問だけが残る
+    expect(
+      screen.getByText(/ダウンロード数が保持されない/),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText(/効果」欄は何を書けばいい/),
+    ).not.toBeInTheDocument()
+  })
+
+  it('未解決フィルタ URL でフィルタされる', () => {
+    renderAt('/qa?resolved=false')
+    // 未解決のみ → q3 だけ表示、解決済 q1/q2 は非表示
+    expect(screen.getByText(/お気に入りタグを付けたい/)).toBeInTheDocument()
+    expect(
+      screen.queryByText(/効果」欄は何を書けばいい/),
+    ).not.toBeInTheDocument()
+  })
+
+  it('質問詳細でベストアンサーが表示される', () => {
+    renderAt('/qa/q1')
+    expect(
+      screen.getByRole('heading', {
+        name: /ツール登録時に「効果」欄は何を書けばいいですか？/,
+      }),
+    ).toBeInTheDocument()
+    // 承認済回答は .qa-accept-badge が付く
+    expect(document.querySelector('.qa-accept-badge')).not.toBeNull()
+  })
+
+  it('メンバー(member)は回答フォームが出ず、その旨表示される', () => {
+    seedSession('suzuki')
+    renderAt('/qa/q3')
+    expect(
+      screen.getByText(/回答の投稿は.*ロールのユーザーのみ/),
+    ).toBeInTheDocument()
+  })
+
+  it('組織管理者は回答フォームが表示される', () => {
+    seedSession('tanaka')
+    renderAt('/qa/q3')
+    expect(
+      screen.getByRole('heading', { name: /回答を投稿/ }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: '回答を投稿' }),
+    ).toBeInTheDocument()
+  })
+
+  it('ツール管理者(佐藤一郎)も回答フォームが表示される', () => {
+    seedSession('sato')
+    renderAt('/qa/q3')
+    expect(
+      screen.getByRole('heading', { name: /回答を投稿/ }),
+    ).toBeInTheDocument()
+  })
+})

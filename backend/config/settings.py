@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "accounts",
     "tools",
     "metrics",
+    "docs",
 ]
 
 MIDDLEWARE = [

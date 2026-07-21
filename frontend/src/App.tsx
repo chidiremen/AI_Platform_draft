@@ -8,6 +8,8 @@ import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
 import AdminUsersPage from './pages/AdminUsersPage'
 import ProfilePage from './pages/ProfilePage'
+import GuidePage from './pages/GuidePage'
+import QAPage from './pages/QAPage'
 import { AppProvider, useApp } from './store'
 
 function AuthedApp() {
@@ -45,6 +47,12 @@ function AuthedApp() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/admin/dashboard" element={<DashboardPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
+          <Route path="/guide" element={<GuidePage />} />
+          <Route path="/guide/:slug" element={<GuidePage />} />
+          <Route path="/guide/:slug/:action" element={<GuidePage />} />
+          <Route path="/qa" element={<QAPage />} />
+          <Route path="/qa/:id" element={<QAPage />} />
+          <Route path="/qa/:id/:action" element={<QAPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

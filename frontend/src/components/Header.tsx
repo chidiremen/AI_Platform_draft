@@ -47,6 +47,12 @@ export default function Header() {
         </form>
 
         <nav className="header-nav">
+          <Link className="btn btn-ghost" to="/guide">
+            📚 ガイド
+          </Link>
+          <Link className="btn btn-ghost" to="/qa">
+            💬 Q&A
+          </Link>
           <Link className="btn btn-ghost" to="/admin/dashboard">
             📊 ダッシュボード
           </Link>

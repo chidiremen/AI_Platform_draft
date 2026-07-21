@@ -4,7 +4,17 @@
  * バックエンドの snake_case レスポンスをフロントの型へマッピングする。
  */
 import { API_BASE, TOKEN_KEY } from '../config'
-import type { CommentType, Tool, ToolComment, ToolType } from '../types'
+import type {
+  Answer,
+  CommentType,
+  DocCategory,
+  DocKind,
+  GuideArticle,
+  Question,
+  Tool,
+  ToolComment,
+  ToolType,
+} from '../types'
 import type { Role, User } from '../data/users'
 import type { AccessRequestRecord, NewToolInput } from '../store'
 
@@ -675,4 +685,302 @@ export async function dashboardFunnel(): Promise<{
   funnel: DashboardFunnelStage[]
 }> {
   return apiFetch('/dashboard/funnel/')
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Docs / Q&A
+// ─────────────────────────────────────────────────────────────────────
+
+interface DocCategoryDTO {
+  id: number
+  kind: DocKind
+  name: string
+  slug: string
+  parent: number | null
+  order: number
+  icon: string
+  article_count?: number
+  question_count?: number
+}
+interface GuideDTO {
+  id: string
+  category: number
+  category_slug: string
+  category_name: string
+  title: string
+  slug: string
+  body: string
+  order: number
+  author: UserDTO | null
+  is_published: boolean
+  created_at: string
+  updated_at: string
+}
+interface AnswerDTO {
+  id: string
+  question: string
+  body: string
+  author: UserDTO | null
+  is_accepted: boolean
+  created_at: string
+  updated_at: string
+}
+interface QuestionDTO {
+  id: string
+  category: number | null
+  category_slug: string | null
+  category_name: string | null
+  title: string
+  body: string
+  tags: string
+  asker: UserDTO | null
+  is_resolved: boolean
+  view_count: number
+  answer_count: number
+  answers?: AnswerDTO[]
+  created_at: string
+  updated_at: string
+}
+
+const authorOf = (u: UserDTO | null | undefined): string =>
+  u ? u.display_name || u.username : '不明'
+
+function mapCategory(d: DocCategoryDTO): DocCategory {
+  return {
+    id: d.id,
+    kind: d.kind,
+    name: d.name,
+    slug: d.slug,
+    parent: d.parent,
+    order: d.order,
+    icon: d.icon,
+    articleCount: d.article_count,
+    questionCount: d.question_count,
+  }
+}
+function mapGuide(d: GuideDTO): GuideArticle {
+  return {
+    id: d.id,
+    categoryId: d.category,
+    categorySlug: d.category_slug,
+    categoryName: d.category_name,
+    title: d.title,
+    slug: d.slug,
+    body: d.body,
+    order: d.order,
+    author: authorOf(d.author),
+    isPublished: d.is_published,
+    createdAt: d.created_at,
+    updatedAt: d.updated_at,
+  }
+}
+function mapAnswer(d: AnswerDTO): Answer {
+  return {
+    id: d.id,
+    questionId: d.question,
+    body: d.body,
+    author: authorOf(d.author),
+    isAccepted: d.is_accepted,
+    createdAt: d.created_at,
+    updatedAt: d.updated_at,
+  }
+}
+function mapQuestion(d: QuestionDTO): Question {
+  return {
+    id: d.id,
+    categoryId: d.category,
+    categorySlug: d.category_slug,
+    categoryName: d.category_name,
+    title: d.title,
+    body: d.body,
+    tags: d.tags ? d.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+    asker: authorOf(d.asker),
+    isResolved: d.is_resolved,
+    viewCount: d.view_count,
+    answerCount: d.answer_count,
+    answers: (d.answers ?? []).map(mapAnswer),
+    createdAt: d.created_at,
+    updatedAt: d.updated_at,
+  }
+}
+
+// ── DocCategory ──
+export async function listCategories(kind?: DocKind): Promise<DocCategory[]> {
+  const path = kind ? `/doc-categories/?kind=${kind}` : '/doc-categories/'
+  const list = await apiFetch<DocCategoryDTO[]>(path)
+  return list.map(mapCategory)
+}
+
+// ── Guide ──
+export async function listGuides(params?: {
+  category?: string
+  q?: string
+}): Promise<GuideArticle[]> {
+  const qs = new URLSearchParams()
+  if (params?.category) qs.set('category', params.category)
+  if (params?.q) qs.set('q', params.q)
+  const suffix = qs.toString() ? `?${qs}` : ''
+  const list = await apiFetch<GuideDTO[]>(`/guides/${suffix}`)
+  return list.map(mapGuide)
+}
+
+export async function getGuide(id: string): Promise<GuideArticle> {
+  return mapGuide(await apiFetch<GuideDTO>(`/guides/${id}/`))
+}
+
+export interface GuideInput {
+  category: number
+  title: string
+  slug: string
+  body: string
+  order?: number
+  isPublished?: boolean
+}
+
+export async function createGuide(input: GuideInput): Promise<GuideArticle> {
+  const body = {
+    category: input.category,
+    title: input.title,
+    slug: input.slug,
+    body: input.body,
+    order: input.order ?? 0,
+    is_published: input.isPublished ?? true,
+  }
+  return mapGuide(
+    await apiFetch<GuideDTO>('/guides/', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  )
+}
+
+export async function updateGuide(id: string, input: Partial<GuideInput>): Promise<GuideArticle> {
+  const body: Record<string, unknown> = {}
+  if (input.category != null) body.category = input.category
+  if (input.title != null) body.title = input.title
+  if (input.slug != null) body.slug = input.slug
+  if (input.body != null) body.body = input.body
+  if (input.order != null) body.order = input.order
+  if (input.isPublished != null) body.is_published = input.isPublished
+  return mapGuide(
+    await apiFetch<GuideDTO>(`/guides/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  )
+}
+
+export async function deleteGuide(id: string): Promise<void> {
+  await apiFetch(`/guides/${id}/`, { method: 'DELETE' })
+}
+
+// ── Question ──
+export async function listQuestions(params?: {
+  q?: string
+  category?: string
+  resolved?: boolean
+  mine?: boolean
+}): Promise<Question[]> {
+  const qs = new URLSearchParams()
+  if (params?.q) qs.set('q', params.q)
+  if (params?.category) qs.set('category', params.category)
+  if (params?.resolved != null) qs.set('resolved', String(params.resolved))
+  if (params?.mine) qs.set('mine', 'true')
+  const suffix = qs.toString() ? `?${qs}` : ''
+  const r = await apiFetch<Paginated<QuestionDTO>>(`/questions/${suffix}`)
+  return r.results.map(mapQuestion)
+}
+
+export async function getQuestion(id: string): Promise<Question> {
+  return mapQuestion(await apiFetch<QuestionDTO>(`/questions/${id}/`))
+}
+
+export interface QuestionInput {
+  category?: number | null
+  title: string
+  body: string
+  tags?: string
+}
+
+export async function createQuestion(input: QuestionInput): Promise<Question> {
+  return mapQuestion(
+    await apiFetch<QuestionDTO>('/questions/', {
+      method: 'POST',
+      body: JSON.stringify({
+        category: input.category ?? null,
+        title: input.title,
+        body: input.body,
+        tags: input.tags ?? '',
+      }),
+    }),
+  )
+}
+
+export async function updateQuestion(
+  id: string,
+  input: Partial<QuestionInput>,
+): Promise<Question> {
+  const body: Record<string, unknown> = {}
+  if (input.category !== undefined) body.category = input.category
+  if (input.title != null) body.title = input.title
+  if (input.body != null) body.body = input.body
+  if (input.tags != null) body.tags = input.tags
+  return mapQuestion(
+    await apiFetch<QuestionDTO>(`/questions/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  )
+}
+
+export async function deleteQuestion(id: string): Promise<void> {
+  await apiFetch(`/questions/${id}/`, { method: 'DELETE' })
+}
+
+export async function toggleResolved(id: string): Promise<Question> {
+  return mapQuestion(
+    await apiFetch<QuestionDTO>(`/questions/${id}/toggle-resolved/`, {
+      method: 'POST',
+    }),
+  )
+}
+
+// ── Answer ──
+export async function createAnswer(questionId: string, body: string): Promise<Answer> {
+  return mapAnswer(
+    await apiFetch<AnswerDTO>('/answers/', {
+      method: 'POST',
+      body: JSON.stringify({ question: questionId, body }),
+    }),
+  )
+}
+
+export async function updateAnswer(id: string, body: string): Promise<Answer> {
+  return mapAnswer(
+    await apiFetch<AnswerDTO>(`/answers/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify({ body }),
+    }),
+  )
+}
+
+export async function deleteAnswer(id: string): Promise<void> {
+  await apiFetch(`/answers/${id}/`, { method: 'DELETE' })
+}
+
+export async function acceptAnswer(id: string): Promise<Answer> {
+  return mapAnswer(
+    await apiFetch<AnswerDTO>(`/answers/${id}/accept/`, { method: 'POST' }),
+  )
+}
+
+// ── Attachment (returns absolute URL to embed in markdown) ──
+export async function uploadDocAttachment(file: File | Blob): Promise<string> {
+  const fd = new FormData()
+  fd.append('image', file)
+  const res = await apiFetch<{ url: string }>('/doc-attachments/', {
+    method: 'POST',
+    body: fd,
+  })
+  return res.url
 }

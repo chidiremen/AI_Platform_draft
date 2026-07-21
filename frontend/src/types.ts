@@ -78,3 +78,63 @@ export interface ToolComment {
   likeCount: number
   likedByMe: boolean
 }
+
+// ── ドキュメント / Q&A ──
+
+export type DocKind = 'guide' | 'qa'
+
+export interface DocCategory {
+  id: number
+  kind: DocKind
+  name: string
+  slug: string
+  parent: number | null
+  order: number
+  icon: string
+  /** kind='guide' の場合のみ意味あり */
+  articleCount?: number
+  /** kind='qa' の場合のみ意味あり */
+  questionCount?: number
+}
+
+export interface GuideArticle {
+  id: string
+  categoryId: number
+  categorySlug: string
+  categoryName: string
+  title: string
+  slug: string
+  body: string
+  order: number
+  author: string
+  isPublished: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Answer {
+  id: string
+  questionId: string
+  body: string
+  author: string
+  isAccepted: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Question {
+  id: string
+  categoryId: number | null
+  categorySlug: string | null
+  categoryName: string | null
+  title: string
+  body: string
+  tags: string[]
+  asker: string
+  isResolved: boolean
+  viewCount: number
+  answerCount: number
+  answers?: Answer[]
+  createdAt: string
+  updatedAt: string
+}
