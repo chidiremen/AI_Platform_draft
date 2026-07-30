@@ -1,10 +1,16 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { USE_MOCK } from '../config'
 import * as api from '../api'
 import { useApp } from '../store'
 import { isAdminRole } from '../data/users'
 import type { ForumCategory, ForumPost, ForumThread } from '../types'
-import { MOCK_THREADS, mockPosterId } from '../data/docs/mockForum'
+import {
+  MOCK_FORUM_AUTHORS,
+  MOCK_THREADS,
+  anonNameForThread,
+  mockPosterId,
+  resolveDisplayName,
+} from '../data/docs/mockForum'
 
 const KEY = 'aitc_forum_threads_v1'
 
@@ -87,6 +93,8 @@ export function useForumStore() {
       body: string
       category: ForumCategory
       tags: string[]
+      /** 名乗る名前。空欄なら名無し、@付きなら固定ハンドル */
+      posterName?: string
     }): Promise<string> => {
       if (!USE_MOCK) {
         const t = await api.createThread({
@@ -94,6 +102,7 @@ export function useForumStore() {
           body: input.body,
           category: input.category,
           tags: input.tags.join(','),
+          posterName: input.posterName ?? '',
         })
         setThreads((prev) => [t, ...prev])
         toast?.('🧵 スレッドを立てました')
@@ -102,14 +111,21 @@ export function useForumStore() {
       const id = `t${Date.now()}`
       const now = new Date().toISOString()
       const author = currentUser?.name ?? '名無しさん'
+      const posterName = (input.posterName ?? '').trim()
+      // 実体は UI に載せず、特定用のマップにだけ記録する（API モードと同じ扱い）
+      MOCK_FORUM_AUTHORS[id] = author
       const t: ForumThread = {
         id,
         title: input.title,
         body: input.body,
         category: input.category,
         tags: input.tags,
-        author,
+        displayName: resolveDisplayName(posterName, id),
+        isHandle: posterName.startsWith('@'),
         posterId: mockPosterId(author, id, now.slice(0, 10)),
+        anonName: anonNameForThread(id),
+        canEdit: true,
+        isMine: true,
         isPinned: false,
         isClosed: false,
         viewCount: 0,
@@ -238,9 +254,9 @@ export function useForumStore() {
   )
 
   const addPost = useCallback(
-    async (threadId: string, body: string) => {
+    async (threadId: string, body: string, posterName = '') => {
       if (!USE_MOCK) {
-        const p = await api.createForumPost(threadId, body)
+        const p = await api.createForumPost(threadId, body, posterName)
         setThreads((prev) =>
           prev.map((x) =>
             x.id === threadId
@@ -258,18 +274,25 @@ export function useForumStore() {
       }
       const now = new Date().toISOString()
       const author = currentUser?.name ?? '名無しさん'
+      const name = (posterName || '').trim()
       setThreads((prev) =>
         prev.map((x) => {
           if (x.id !== threadId) return x
           const nextNumber =
             Math.max(1, ...(x.posts ?? []).map((p) => p.number)) + 1
+          const pid = `p${Date.now()}`
+          // 実体は UI に載せず、特定用のマップにだけ記録する
+          MOCK_FORUM_AUTHORS[pid] = author
           const p: ForumPost = {
-            id: `p${Date.now()}`,
+            id: pid,
             threadId,
             number: nextNumber,
             body,
-            author,
+            displayName: resolveDisplayName(name, threadId),
+            isHandle: name.startsWith('@'),
             posterId: mockPosterId(author, threadId, now.slice(0, 10)),
+            canEdit: true,
+            isMine: true,
             createdAt: now,
             updatedAt: now,
           }
@@ -338,10 +361,69 @@ export function useForumStore() {
     [toast],
   )
 
+
+  /**
+   * モックモードでの canEdit / isMine の補完。
+   * 実 API モードではサーバが計算した値がそのまま入っているので何もしない。
+   * （MOCK_FORUM_AUTHORS が投稿者の実体を持つ = サーバの author 相当）
+   */
+  const decorated = useMemo(() => {
+    if (!USE_MOCK) return threads
+    const me = currentUser?.name
+    const mine = (id: string) => !!me && MOCK_FORUM_AUTHORS[id] === me
+    return threads.map((t) => ({
+      ...t,
+      isMine: mine(t.id),
+      canEdit: isAdmin || mine(t.id),
+      posts: (t.posts ?? []).map((p) => ({
+        ...p,
+        isMine: mine(p.id),
+        canEdit: isAdmin || mine(p.id),
+      })),
+    }))
+  }, [threads, currentUser, isAdmin])
+
+  /**
+   * 【管理者限定】匿名投稿の投稿者を特定する。
+   * 実 API では専用エンドポイントを叩き、サーバ側で監査ログに記録される。
+   * モックでは MOCK_FORUM_AUTHORS から引く。
+   */
+  const revealPoster = useCallback(
+    async (
+      target: 'thread' | 'post',
+      id: string,
+      reason = '',
+    ): Promise<{ displayName: string; posterId: string; user: string } | null> => {
+      if (!isAdmin) return null
+      if (!USE_MOCK) {
+        const r =
+          target === 'thread'
+            ? await api.revealForumThread(id, reason)
+            : await api.revealForumPost(id, reason)
+        return {
+          displayName: r.displayName,
+          posterId: r.posterId,
+          user: r.userDisplayName || r.username || '不明',
+        }
+      }
+      const found =
+        target === 'thread'
+          ? threads.find((t) => t.id === id)
+          : threads.flatMap((t) => t.posts ?? []).find((p) => p.id === id)
+      return {
+        displayName: found?.displayName ?? '不明',
+        posterId: found?.posterId ?? '',
+        user: MOCK_FORUM_AUTHORS[id] ?? '不明',
+      }
+    },
+    [isAdmin, threads],
+  )
+
   return {
     isAdmin,
     loading,
-    threads,
+    threads: decorated,
+    revealPoster,
     loadThread,
     addThread,
     updateThread,

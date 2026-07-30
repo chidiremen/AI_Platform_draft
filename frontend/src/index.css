@@ -2769,3 +2769,68 @@ button.shot {
   line-height: 1.6;
   display: block;
 }
+
+/* ── フォーラム: 名前入力・固定ハンドル・投稿者特定 ── */
+.res-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.res-name-label {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+.res-name-input {
+  max-width: 260px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.res-name-hint {
+  font-size: 11.5px;
+}
+/* 固定ハンドル（@付き）は 2ch のコテハンっぽく色を変える */
+.res-name.handle {
+  color: var(--purple);
+}
+.res-reveal {
+  background: transparent;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 5px;
+  margin-left: 4px;
+}
+.res-reveal:hover {
+  color: var(--amber);
+  border-color: var(--amber);
+}
+.reveal-note {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  background: rgba(224, 164, 88, 0.1);
+  border-left: 3px solid var(--amber);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 8px 0 14px;
+}
+.reveal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.reveal-table th,
+.reveal-table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.reveal-table th {
+  width: 34%;
+  color: var(--text-muted);
+  font-weight: 600;
+}

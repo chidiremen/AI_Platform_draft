@@ -10,8 +10,39 @@ from rest_framework.response import Response
 
 from accounts.permissions import is_admin
 
-from .models import ForumPost, ForumThread, ThreadVote
-from .serializers import ForumPostSerializer, ForumThreadSerializer
+from .models import ForumAnonName, ForumPost, ForumRevealLog, ForumThread, ThreadVote
+from .serializers import (
+    ForumPostSerializer,
+    ForumRevealSerializer,
+    ForumThreadSerializer,
+)
+
+
+def remember_handle(user, poster_name: str) -> None:
+    """@付きで名乗ったら固定ハンドルとして記憶する（次回フォームの初期値）。"""
+    name = (poster_name or "").strip()
+    if not name.startswith("@"):
+        return
+    if user and user.is_authenticated and user.forum_handle != name:
+        user.forum_handle = name
+        user.save(update_fields=["forum_handle"])
+
+
+def build_reveal(obj, target_type: str) -> dict:
+    """reveal API のレスポンス本体を組み立てる。"""
+    u = obj.author
+    return {
+        "target_type": target_type,
+        "target_id": str(obj.id),
+        "poster_id": obj.poster_id,
+        "display_name": obj.display_name,
+        "username": getattr(u, "username", None),
+        "user_display_name": (getattr(u, "display_name", "") or getattr(u, "username", None))
+        if u
+        else None,
+        "email": getattr(u, "email", "") if u else None,
+        "role": getattr(u, "role", None),
+    }
 
 
 class OwnerOrAdmin(permissions.BasePermission):
@@ -77,6 +108,9 @@ class ForumThreadViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+        remember_handle(
+            self.request.user, serializer.validated_data.get("poster_name", "")
+        )
 
     def retrieve(self, request, *args, **kwargs):
         obj = self.get_object()
@@ -115,6 +149,29 @@ class ForumThreadViewSet(viewsets.ModelViewSet):
         thread.save(update_fields=["is_pinned", "updated_at"])
         return Response(self.get_serializer(thread).data)
 
+    @action(detail=True, methods=["post"], url_path="reveal")
+    def reveal(self, request, pk=None):
+        """【管理者限定】このスレッドの投稿者を特定する。
+
+        匿名掲示板として通常は投稿者を一切返さないが、荒らし対応などの
+        必要が生じたときに限り管理者が明示的に呼び出せる。
+        呼び出しは :class:`ForumRevealLog` に必ず記録される。
+        """
+        if not is_admin(request.user):
+            return Response(
+                {"detail": "権限がありません"}, status=status.HTTP_403_FORBIDDEN
+            )
+        thread = self.get_object()
+        data = build_reveal(thread, "thread")
+        ForumRevealLog.objects.create(
+            admin=request.user,
+            target_type=ForumRevealLog.Target.THREAD,
+            target_id=thread.id,
+            revealed_user=thread.author,
+            reason=request.data.get("reason", "")[:200],
+        )
+        return Response(ForumRevealSerializer(data).data)
+
 
 class ForumPostViewSet(viewsets.ModelViewSet):
     """レス。``?thread=<uuid>`` でスレ絞り込み。"""
@@ -135,5 +192,26 @@ class ForumPostViewSet(viewsets.ModelViewSet):
         if thread.is_closed and not is_admin(self.request.user):
             raise ValidationError({"detail": "このスレッドはレス受付を停止しています"})
         serializer.save(author=self.request.user)
+        remember_handle(
+            self.request.user, serializer.validated_data.get("poster_name", "")
+        )
         # スレの最終レス日時を更新（一覧の既定ソート用）
         ForumThread.objects.filter(pk=thread.pk).update(last_posted_at=timezone.now())
+
+    @action(detail=True, methods=["post"], url_path="reveal")
+    def reveal(self, request, pk=None):
+        """【管理者限定】このレスの投稿者を特定する（監査ログに記録）。"""
+        if not is_admin(request.user):
+            return Response(
+                {"detail": "権限がありません"}, status=status.HTTP_403_FORBIDDEN
+            )
+        post = self.get_object()
+        data = build_reveal(post, "post")
+        ForumRevealLog.objects.create(
+            admin=request.user,
+            target_type=ForumRevealLog.Target.POST,
+            target_id=post.id,
+            revealed_user=post.author,
+            reason=request.data.get("reason", "")[:200],
+        )
+        return Response(ForumRevealSerializer(data).data)

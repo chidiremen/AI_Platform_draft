@@ -905,9 +905,11 @@ describe('アイデアフォーラム（2ch風）', () => {
     // 1レス目 = スレ本文
     const res1 = document.getElementById('res-1') as HTMLElement
     expect(res1).not.toBeNull()
-    expect(within(res1).getByText('鈴木花子')).toBeInTheDocument()
-    // ID:xxxxxxxx 表記
-    expect(res1.querySelector('.res-id')?.textContent).toMatch(/^ID:[0-9a-f]{8}$/)
+    // 匿名掲示板なので実名は出さない。名無し表記が入る
+    expect(within(res1).queryByText('鈴木花子')).not.toBeInTheDocument()
+    expect(res1.querySelector('.res-name')?.textContent).toMatch(/^名無しの/)
+    // ID は英大小文字＋数字の 8 桁（hex ではない）
+    expect(res1.querySelector('.res-id')?.textContent).toMatch(/^ID:[0-9A-Za-z]{8}$/)
     // レス 2〜4 が存在
     expect(document.getElementById('res-2')).not.toBeNull()
     expect(document.getElementById('res-4')).not.toBeNull()
@@ -1098,5 +1100,94 @@ describe('ヘッダー導線', () => {
     renderAt('/')
     const nav = document.querySelector('.header-nav') as HTMLElement
     expect(nav.querySelectorAll('.nav-label').length).toBeGreaterThanOrEqual(5)
+  })
+})
+
+describe('フォーラム: 匿名化と名前入力', () => {
+  it('スレ一覧でも実名は出ず名無し表記になる', () => {
+    renderAt('/forum')
+    expect(screen.queryByText(/鈴木花子/)).not.toBeInTheDocument()
+    expect(document.body.textContent).toMatch(/名無しの/)
+  })
+
+  it('同じスレッド内の名無し表記は全レスで一致する', () => {
+    renderAt('/forum/t1')
+    const names = [...document.querySelectorAll('.res-name')].map(
+      (n) => n.textContent ?? '',
+    )
+    expect(names.length).toBeGreaterThan(1)
+    // 全員が同じ「名無しの○○」（このスレ用の表記）
+    expect(new Set(names).size).toBe(1)
+    expect(names[0]).toMatch(/^名無しの/)
+  })
+
+  it('スレッドが違えば名無し表記も変わりうる（決定的に割当）', () => {
+    renderAt('/forum/t1')
+    const n1 = document.querySelector('.res-name')?.textContent
+    // 同じスレを開き直しても同じ表記（決定的）
+    renderAt('/forum/t1')
+    const again = document.querySelector('.res-name')?.textContent
+    expect(again).toBe(n1)
+  })
+
+  it('レス投稿欄に名前入力があり、プレースホルダにスレの名無し表記が出る', () => {
+    renderAt('/forum/t1')
+    const input = document.getElementById('forum-poster-name') as HTMLInputElement
+    expect(input).not.toBeNull()
+    expect(input.placeholder).toMatch(/空欄で「名無しの/)
+  })
+
+  it('名前を空欄でレスすると名無し表記になる', async () => {
+    renderAt('/forum/t1')
+    const ta = document.querySelector('.res-textarea') as HTMLElement
+    fireEvent.change(ta, { target: { value: '名無しで書き込み' } })
+    fireEvent.click(screen.getByRole('button', { name: '書き込む' }))
+    expect(await screen.findByText('名無しで書き込み')).toBeInTheDocument()
+    const names = [...document.querySelectorAll('.res-name')].map((n) => n.textContent)
+    expect(new Set(names).size).toBe(1) // 追加レスも同じ名無し表記
+  })
+
+  it('@付きの名前でレスすると固定ハンドルとして表示される', async () => {
+    renderAt('/forum/t1')
+    fireEvent.change(document.getElementById('forum-poster-name') as HTMLElement, {
+      target: { value: '@kotehan' },
+    })
+    const ta = document.querySelector('.res-textarea') as HTMLElement
+    fireEvent.change(ta, { target: { value: 'コテハンで書き込み' } })
+    fireEvent.click(screen.getByRole('button', { name: '書き込む' }))
+    expect(await screen.findByText('コテハンで書き込み')).toBeInTheDocument()
+    const handle = [...document.querySelectorAll('.res-name')].find(
+      (n) => n.textContent === '@kotehan',
+    )
+    expect(handle).toBeTruthy()
+    expect(handle?.classList.contains('handle')).toBe(true)
+    // 次回のためにローカルへ保存される
+    expect(localStorage.getItem('aitc_forum_poster_name_v1')).toBe('@kotehan')
+  })
+
+  it('投稿IDは英大小文字+数字の8桁', () => {
+    renderAt('/forum/t1')
+    for (const el of document.querySelectorAll('.res-id')) {
+      expect(el.textContent).toMatch(/^ID:[0-9A-Za-z]{8}$/)
+    }
+  })
+
+  it('管理者には 🔍 投稿者特定ボタンが出て、実ユーザーを表示できる', async () => {
+    seedSession('tanaka') // 組織管理者
+    renderAt('/forum/t1')
+    const btns = document.querySelectorAll('.res-reveal')
+    expect(btns.length).toBeGreaterThan(0)
+    fireEvent.click(btns[0])
+    expect(await screen.findByText('🔍 投稿者の特定')).toBeInTheDocument()
+    // 監査ログに残る旨の注意書き
+    expect(screen.getByText(/監査ログに記録されます/)).toBeInTheDocument()
+    // t1 のスレ主は鈴木花子
+    expect(await screen.findByText('鈴木花子')).toBeInTheDocument()
+  })
+
+  it('一般メンバーには 🔍 投稿者特定ボタンが出ない', () => {
+    seedSession('suzuki') // メンバー
+    renderAt('/forum/t1')
+    expect(document.querySelectorAll('.res-reveal').length).toBe(0)
   })
 })

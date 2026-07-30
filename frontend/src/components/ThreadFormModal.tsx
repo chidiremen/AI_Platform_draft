@@ -10,6 +10,8 @@ interface Props {
     body: string
     category: ForumCategory
     tags: string[]
+    /** 名乗る名前。空欄なら名無し、@付きなら固定ハンドル */
+    posterName?: string
   }) => Promise<void>
   onClose: () => void
 }
@@ -20,6 +22,14 @@ export default function ThreadFormModal({ initial, onSubmit, onClose }: Props) {
   const [body, setBody] = useState(initial?.body ?? '')
   const [category, setCategory] = useState<ForumCategory>(initial?.category ?? 'idea')
   const [tags, setTags] = useState((initial?.tags ?? []).join(', '))
+  // 名乗る名前。前回 @ で名乗っていればそれを初期値にする（固定ハンドル）
+  const [posterName, setPosterName] = useState(() => {
+    try {
+      return localStorage.getItem('aitc_forum_poster_name_v1') ?? ''
+    } catch {
+      return ''
+    }
+  })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -41,7 +51,15 @@ export default function ThreadFormModal({ initial, onSubmit, onClose }: Props) {
         body,
         category,
         tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
+        posterName: posterName.trim(),
       })
+      try {
+        const n = posterName.trim()
+        if (n.startsWith('@')) localStorage.setItem('aitc_forum_poster_name_v1', n)
+        else if (!n) localStorage.removeItem('aitc_forum_poster_name_v1')
+      } catch {
+        /* ignore */
+      }
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存に失敗しました')
@@ -94,6 +112,19 @@ export default function ThreadFormModal({ initial, onSubmit, onClose }: Props) {
             placeholder={'どんなツールが欲しいか、なぜ欲しいかを書いてください。\n``` で囲むとコード表示になります。'}
             style={{ minHeight: 160 }}
           />
+
+          <div style={{ height: 12 }} />
+          <label className="label">名前</label>
+          <input
+            className="input"
+            value={posterName}
+            onChange={(e) => setPosterName(e.target.value)}
+            placeholder="空欄で名無し（スレッドごとの表記になります）"
+            maxLength={50}
+          />
+          <div className="hint">
+            空欄=名無し ／ <code>@名前</code> で固定ハンドル（次回も引き継ぎ）
+          </div>
 
           <div style={{ height: 12 }} />
           <label className="label">タグ（カンマ区切り）</label>

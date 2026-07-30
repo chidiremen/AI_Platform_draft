@@ -26,6 +26,9 @@ class User(AbstractUser):
         default=Role.MEMBER,
     )
     display_name = models.CharField(max_length=150, blank=True)
+    #: フォーラムで最後に使った固定ハンドル（@付き）。投稿フォームの
+    #: 初期値として使うだけで、匿名性には影響しない。
+    forum_handle = models.CharField(max_length=50, blank=True)
 
     @property
     def is_admin_role(self) -> bool:

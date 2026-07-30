@@ -152,9 +152,16 @@ export interface ForumPost {
   /** スレッド内のレス番号（>>N の N）。スレ本文は 1 */
   number: number
   body: string
-  author: string
-  /** 2ch 風の匿名ID（日付+ユーザー+スレで決まる 8桁） */
+  /** 表示名。空欄投稿ならスレッド毎の「名無し」表記、@付きなら固定ハンドル */
+  displayName: string
+  /** 固定ハンドル（@付き）で名乗っているか */
+  isHandle: boolean
+  /** 2ch 風の匿名ID（日付+ユーザー+スレで決まる 8桁 base62） */
   posterId: string
+  /** 編集/削除できるか（サーバ判定。投稿者本人 or 管理者） */
+  canEdit: boolean
+  /** 自分の投稿か */
+  isMine: boolean
   createdAt: string
   updatedAt: string
 }
@@ -165,8 +172,14 @@ export interface ForumThread {
   body: string
   category: ForumCategory
   tags: string[]
-  author: string
+  /** 表示名（名無し表記 or 名乗った名前 / 固定ハンドル） */
+  displayName: string
+  isHandle: boolean
   posterId: string
+  /** このスレッドで使われる「名無し」表記 */
+  anonName: string
+  canEdit: boolean
+  isMine: boolean
   isPinned: boolean
   isClosed: boolean
   viewCount: number

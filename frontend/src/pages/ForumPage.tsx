@@ -21,6 +21,20 @@ export default function ForumPage() {
 
 // ══════════════════════════ スレ一覧 ══════════════════════════
 
+/** 固定ハンドルを覚えておく localStorage キー */
+const FORUM_NAME_KEY = 'aitc_forum_poster_name_v1'
+
+/** 管理者の「投稿者を特定」モーダルの状態 */
+interface RevealState {
+  loading: boolean
+  /** 特定対象の表示名（名無し表記 or ハンドル） */
+  displayName: string
+  /** 特定された実ユーザー */
+  user?: string
+  posterId?: string
+  error?: string
+}
+
 function ThreadList() {
   const store = useForumStore()
   const { threads } = store
@@ -37,7 +51,7 @@ function ThreadList() {
   const list = useMemo(() => {
     let l = [...threads]
     if (cat) l = l.filter((t) => t.category === cat)
-    if (mine && currentUser) l = l.filter((t) => t.author === currentUser.name)
+    if (mine && currentUser) l = l.filter((t) => t.isMine)
     if (q.trim()) {
       const s = q.trim().toLowerCase()
       l = l.filter(
@@ -164,7 +178,7 @@ function ThreadList() {
                   </button>
                   <span className="dim">👁 {t.viewCount}</span>
                   <span className="dim">
-                    {t.author}・
+                    {t.displayName}・
                     {formatResDate(t.lastPostedAt ?? t.createdAt)}
                   </span>
                   {t.tags.map((tag) => (
@@ -201,16 +215,47 @@ function ThreadList() {
 
 function ThreadView({ threadId }: { threadId: string }) {
   const store = useForumStore()
-  const { currentUser } = useApp()
   const navigate = useNavigate()
   const found = store.threads.find((x) => x.id === threadId)
 
   const [reply, setReply] = useState('')
+  // 名乗る名前。空欄なら名無し。@付きは固定ハンドルとして次回以降も引き継ぐ。
+  const [posterName, setPosterName] = useState(() => {
+    try {
+      return localStorage.getItem(FORUM_NAME_KEY) ?? ''
+    } catch {
+      return ''
+    }
+  })
   const [editOpen, setEditOpen] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
   const [editingPostId, setEditingPostId] = useState<string | null>(null)
   const [editingBody, setEditingBody] = useState('')
   const [posting, setPosting] = useState(false)
+  const [reveal, setReveal] = useState<RevealState | null>(null)
+
+  /** 管理者のみ: 投稿者を特定してモーダルに出す（監査ログに残る操作） */
+  async function doReveal(
+    target: 'thread' | 'post',
+    id: string,
+    displayName: string,
+  ) {
+    setReveal({ loading: true, displayName })
+    try {
+      const r = await store.revealPoster(target, id)
+      setReveal(
+        r
+          ? { loading: false, displayName: r.displayName, user: r.user, posterId: r.posterId }
+          : { loading: false, displayName, error: '特定できませんでした' },
+      )
+    } catch (e) {
+      setReveal({
+        loading: false,
+        displayName,
+        error: e instanceof Error ? e.message : '特定に失敗しました',
+      })
+    }
+  }
 
   // 実APIモードではレス込みの詳細を取得
   useEffect(() => {
@@ -230,15 +275,16 @@ function ThreadView({ threadId }: { threadId: string }) {
   const t = found
 
   const posts = t.posts ?? []
-  const canEditThread = store.isAdmin || t.author === currentUser?.name
-  const canEditPost = (author: string) => store.isAdmin || author === currentUser?.name
+  // 権限はサーバ（モックでは store）が算出した can_edit を使う。
+  // 匿名掲示板なので投稿者名から判定してはいけない。
+  const canEditThread = t.canEdit
   const cat = FORUM_CATEGORY_MAP[t.category]
 
   // >>N ポップアップ用の辞書（1 = スレ本文）
   const bodyByNumber: Record<number, { body: string; author: string }> = {
-    1: { body: t.body, author: t.author },
+    1: { body: t.body, author: t.displayName },
   }
-  for (const p of posts) bodyByNumber[p.number] = { body: p.body, author: p.author }
+  for (const p of posts) bodyByNumber[p.number] = { body: p.body, author: p.displayName }
 
   /** 「>>N」を返信欄に挿入する */
   function quote(n: number) {
@@ -252,8 +298,16 @@ function ThreadView({ threadId }: { threadId: string }) {
     if (!reply.trim()) return
     setPosting(true)
     try {
-      await store.addPost(t.id, reply)
+      await store.addPost(t.id, reply, posterName)
       setReply('')
+      // @付き（固定ハンドル）は次回のためにローカルにも残す
+      try {
+        const n = posterName.trim()
+        if (n.startsWith('@')) localStorage.setItem(FORUM_NAME_KEY, n)
+        else if (!n) localStorage.removeItem(FORUM_NAME_KEY)
+      } catch {
+        /* ignore */
+      }
     } finally {
       setPosting(false)
     }
@@ -296,8 +350,12 @@ function ThreadView({ threadId }: { threadId: string }) {
         <ResItem
           id="res-1"
           number={1}
-          author={t.author}
+          author={t.displayName}
+          isHandle={t.isHandle}
           posterId={t.posterId}
+          onReveal={
+            store.isAdmin ? () => doReveal('thread', t.id, t.displayName) : undefined
+          }
           createdAt={t.createdAt}
           body={t.body}
           bodyByNumber={bodyByNumber}
@@ -330,8 +388,12 @@ function ThreadView({ threadId }: { threadId: string }) {
             key={p.id}
             id={`res-${p.number}`}
             number={p.number}
-            author={p.author}
+            author={p.displayName}
+            isHandle={p.isHandle}
             posterId={p.posterId}
+            onReveal={
+              store.isAdmin ? () => doReveal('post', p.id, p.displayName) : undefined
+            }
             createdAt={p.createdAt}
             body={p.body}
             bodyByNumber={bodyByNumber}
@@ -345,7 +407,7 @@ function ThreadView({ threadId }: { threadId: string }) {
               setEditingPostId(null)
             }}
             actions={
-              canEditPost(p.author) ? (
+              p.canEdit ? (
                 <>
                   <button
                     className="res-action"
@@ -380,8 +442,23 @@ function ThreadView({ threadId }: { threadId: string }) {
             <div className="res-form-head">
               <strong>✍️ レスを書く</strong>
               <span className="dim">
-                名前: {currentUser?.name ?? '名無しさん'} ／ <code>&gt;&gt;2</code>{' '}
-                でレス参照、<code>```</code> でコード
+                <code>&gt;&gt;2</code> でレス参照、<code>```</code> でコード
+              </span>
+            </div>
+            <div className="res-name-row">
+              <label className="res-name-label" htmlFor="forum-poster-name">
+                名前
+              </label>
+              <input
+                id="forum-poster-name"
+                className="input res-name-input"
+                value={posterName}
+                onChange={(e) => setPosterName(e.target.value)}
+                placeholder={`空欄で「${t.anonName}」`}
+                maxLength={50}
+              />
+              <span className="dim res-name-hint">
+                空欄=名無し ／ <code>@名前</code> で固定ハンドル
               </span>
             </div>
             <textarea
@@ -432,6 +509,50 @@ function ThreadView({ threadId }: { threadId: string }) {
           onClose={() => setShowDelete(false)}
         />
       )}
+
+      {/* 管理者限定: 投稿者の特定結果 */}
+      {reveal && (
+        <div className="modal-overlay" onClick={() => setReveal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>🔍 投稿者の特定</h3>
+            <div className="reveal-note">
+              匿名掲示板のため通常は投稿者を表示しません。この操作は
+              <strong>監査ログに記録されます</strong>。
+            </div>
+            {reveal.loading ? (
+              <p>照会中…</p>
+            ) : reveal.error ? (
+              <div className="login-error">{reveal.error}</div>
+            ) : (
+              <table className="reveal-table">
+                <tbody>
+                  <tr>
+                    <th>表示名</th>
+                    <td>{reveal.displayName}</td>
+                  </tr>
+                  <tr>
+                    <th>投稿ID</th>
+                    <td>
+                      <code>{reveal.posterId}</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>実際の投稿者</th>
+                    <td>
+                      <strong>{reveal.user}</strong>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
+            <div className="modal-actions">
+              <button className="btn btn-primary" onClick={() => setReveal(null)}>
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -442,7 +563,9 @@ function ResItem({
   id,
   number,
   author,
+  isHandle = false,
   posterId,
+  onReveal,
   createdAt,
   body,
   bodyByNumber,
@@ -458,7 +581,11 @@ function ResItem({
   id: string
   number: number
   author: string
+  /** 固定ハンドル（@付き）なら色を変える */
+  isHandle?: boolean
   posterId: string
+  /** 管理者のみ: 投稿者を特定する（未指定なら操作を出さない） */
+  onReveal?: () => void
   createdAt: string
   body: string
   bodyByNumber: Record<number, { body: string; author: string }>
@@ -478,10 +605,20 @@ function ResItem({
           {number}
         </button>
         <span className="res-name-label">名前：</span>
-        <span className="res-name">{author}</span>
+        <span className={`res-name${isHandle ? ' handle' : ''}`}>{author}</span>
         {isOp && <span className="res-op-badge">スレ主</span>}
         <span className="res-date">{formatResDate(createdAt)}</span>
         <span className="res-id">ID:{posterId}</span>
+        {onReveal && (
+          <button
+            type="button"
+            className="res-reveal"
+            onClick={onReveal}
+            title="投稿者を特定する（管理者のみ・操作は監査ログに記録されます）"
+          >
+            🔍
+          </button>
+        )}
         <span className="res-actions">{actions}</span>
       </div>
       {editing ? (

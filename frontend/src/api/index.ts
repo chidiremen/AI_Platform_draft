@@ -998,8 +998,11 @@ interface ForumPostDTO {
   thread: string
   number: number
   body: string
-  author: UserDTO | null
+  display_name: string
+  is_handle: boolean
   poster_id: string
+  can_edit: boolean
+  is_mine: boolean
   created_at: string
   updated_at: string
 }
@@ -1009,8 +1012,12 @@ interface ForumThreadDTO {
   body: string
   category: ForumCategory
   tags: string
-  author: UserDTO | null
+  display_name: string
+  is_handle: boolean
   poster_id: string
+  anon_name: string
+  can_edit: boolean
+  is_mine: boolean
   is_pinned: boolean
   is_closed: boolean
   view_count: number
@@ -1029,8 +1036,11 @@ function mapForumPost(d: ForumPostDTO): ForumPost {
     threadId: d.thread,
     number: d.number,
     body: d.body,
-    author: authorOf(d.author),
+    displayName: d.display_name,
+    isHandle: !!d.is_handle,
     posterId: d.poster_id,
+    canEdit: !!d.can_edit,
+    isMine: !!d.is_mine,
     createdAt: d.created_at,
     updatedAt: d.updated_at,
   }
@@ -1042,8 +1052,12 @@ function mapForumThread(d: ForumThreadDTO): ForumThread {
     body: d.body,
     category: d.category,
     tags: d.tags ? d.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
-    author: authorOf(d.author),
+    displayName: d.display_name,
+    isHandle: !!d.is_handle,
     posterId: d.poster_id,
+    anonName: d.anon_name,
+    canEdit: !!d.can_edit,
+    isMine: !!d.is_mine,
     isPinned: d.is_pinned,
     isClosed: d.is_closed,
     viewCount: d.view_count,
@@ -1084,6 +1098,8 @@ export interface ThreadInput {
   body: string
   category: ForumCategory
   tags?: string
+  /** 名乗る名前。空欄なら名無し、@付きなら固定ハンドル */
+  posterName?: string
 }
 
 export async function createThread(input: ThreadInput): Promise<ForumThread> {
@@ -1095,6 +1111,7 @@ export async function createThread(input: ThreadInput): Promise<ForumThread> {
         body: input.body,
         category: input.category,
         tags: input.tags ?? '',
+        poster_name: input.posterName ?? '',
       }),
     }),
   )
@@ -1146,11 +1163,72 @@ export async function toggleThreadPinned(id: string): Promise<ForumThread> {
 export async function createForumPost(
   threadId: string,
   body: string,
+  posterName = '',
 ): Promise<ForumPost> {
   return mapForumPost(
     await apiFetch<ForumPostDTO>('/forum/posts/', {
       method: 'POST',
-      body: JSON.stringify({ thread: threadId, body }),
+      body: JSON.stringify({ thread: threadId, body, poster_name: posterName }),
+    }),
+  )
+}
+
+/** 【管理者限定】匿名投稿の投稿者を特定する（サーバ側で監査ログに記録される）。 */
+export interface ForumReveal {
+  targetType: string
+  targetId: string
+  posterId: string
+  displayName: string
+  username: string | null
+  userDisplayName: string | null
+  email: string | null
+  role: string | null
+}
+
+interface ForumRevealDTO {
+  target_type: string
+  target_id: string
+  poster_id: string
+  display_name: string
+  username: string | null
+  user_display_name: string | null
+  email: string | null
+  role: string | null
+}
+
+function mapReveal(d: ForumRevealDTO): ForumReveal {
+  return {
+    targetType: d.target_type,
+    targetId: d.target_id,
+    posterId: d.poster_id,
+    displayName: d.display_name,
+    username: d.username,
+    userDisplayName: d.user_display_name,
+    email: d.email,
+    role: d.role,
+  }
+}
+
+export async function revealForumPost(
+  id: string,
+  reason = '',
+): Promise<ForumReveal> {
+  return mapReveal(
+    await apiFetch<ForumRevealDTO>(`/forum/posts/${id}/reveal/`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  )
+}
+
+export async function revealForumThread(
+  id: string,
+  reason = '',
+): Promise<ForumReveal> {
+  return mapReveal(
+    await apiFetch<ForumRevealDTO>(`/forum/threads/${id}/reveal/`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
     }),
   )
 }
