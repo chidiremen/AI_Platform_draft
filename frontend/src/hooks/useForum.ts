@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
 import { USE_MOCK } from '../config'
 import * as api from '../api'
 import { useApp } from '../store'
@@ -33,6 +42,36 @@ function savePersisted(v: ForumThread[]) {
   }
 }
 
+/**
+ * 一覧レスポンスを既存 state にマージする。
+ *
+ * 一覧 API は各スレッドの ``posts`` を返さない（詳細のみ）。素朴に置き換えると、
+ * 既に詳細取得済みのスレッドの ``posts`` が消えて「>>1 しか表示されない」状態に
+ * なる（一覧 fetch と詳細 fetch が競合し、一覧が後に着いたときに発生。
+ * ページを F5 すると両方同時に走るため高確率で踏む）。
+ * そこで:
+ *   - 受信側に posts が無ければ、既存の posts を引き継ぐ
+ *   - 一覧に含まれないが詳細取得済みのスレッドは捨てずに残す
+ *     （一覧はページネーションされるため、直リンクで開いたスレが消えないように）
+ */
+export function mergeThreadList(
+  prev: ForumThread[],
+  incoming: ForumThread[],
+): ForumThread[] {
+  const prevById = new Map(prev.map((t) => [t.id, t]))
+  const incomingIds = new Set(incoming.map((t) => t.id))
+  const merged = incoming.map((t) => {
+    const old = prevById.get(t.id)
+    return t.posts === undefined && old?.posts !== undefined
+      ? { ...t, posts: old.posts }
+      : t
+  })
+  const keep = prev.filter(
+    (t) => !incomingIds.has(t.id) && t.posts !== undefined,
+  )
+  return [...merged, ...keep]
+}
+
 export const FORUM_CATEGORIES: { value: ForumCategory; label: string; icon: string }[] = [
   { value: 'idea', label: 'ほしいツール', icon: '💡' },
   { value: 'discussion', label: '相談・議論', icon: '🗣️' },
@@ -44,8 +83,15 @@ export const FORUM_CATEGORY_MAP = Object.fromEntries(
   FORUM_CATEGORIES.map((c) => [c.value, c]),
 ) as Record<ForumCategory, { value: ForumCategory; label: string; icon: string }>
 
-/** フォーラムのストア。mock は localStorage、実API は fetch。 */
-export function useForumStore() {
+/**
+ * フォーラムのストア本体。mock は localStorage、実API は fetch。
+ *
+ * ⚠️ 直接呼ばないこと。この hook は state を「生成」するため、複数箇所から
+ * 呼ぶとコンポーネントごとに別インスタンスになり、一覧側と詳細側で状態が
+ * 食い違う（詳細で取得したレスが一覧側の state に入らず消える）。
+ * 利用側は必ず Context 経由の {@link useForumStore} を使う。
+ */
+function useForumStoreState() {
   const { currentUser, toast } = useApp()
   const isAdmin = isAdminRole(currentUser?.role)
   const [threads, setThreads] = useState<ForumThread[]>(() => loadPersisted())
@@ -61,7 +107,8 @@ export function useForumStore() {
       setLoading(true)
       try {
         const list = await api.listThreads()
-        if (active) setThreads(list)
+        // 置き換えではなくマージ（詳細取得済みの posts を消さない）
+        if (active) setThreads((prev) => mergeThreadList(prev, list))
       } catch (e) {
         toast?.(`フォーラム取得失敗: ${e instanceof Error ? e.message : ''}`)
       } finally {
@@ -435,4 +482,30 @@ export function useForumStore() {
     updatePost,
     deletePost,
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Context — アプリ全体で単一のフォーラムストアを共有する
+// ─────────────────────────────────────────────────────────────────────
+
+type ForumStore = ReturnType<typeof useForumStoreState>
+
+const ForumContext = createContext<ForumStore | null>(null)
+
+/** フォーラムストアの Provider。App のルート付近で1回だけマウントする。 */
+export function ForumProvider({ children }: { children: ReactNode }) {
+  const value = useForumStoreState()
+  return createElement(ForumContext.Provider, { value }, children)
+}
+
+/**
+ * フォーラムストアを取得する（アプリ全体で共有された単一インスタンス）。
+ * `ForumProvider` の外で呼ぶと例外を投げる。
+ */
+export function useForumStore(): ForumStore {
+  const ctx = useContext(ForumContext)
+  if (!ctx) {
+    throw new Error('useForumStore must be used within <ForumProvider>')
+  }
+  return ctx
 }

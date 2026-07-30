@@ -1191,3 +1191,49 @@ describe('フォーラム: 匿名化と名前入力', () => {
     expect(document.querySelectorAll('.res-reveal').length).toBe(0)
   })
 })
+
+describe('回帰: フォーラムのレスが消える（>>1 しか出ない）', () => {
+  it('スレ詳細で全レスが表示される', () => {
+    renderAt('/forum/t1')
+    expect(document.getElementById('res-1')).not.toBeNull()
+    expect(document.getElementById('res-2')).not.toBeNull()
+    expect(document.getElementById('res-3')).not.toBeNull()
+    expect(document.getElementById('res-4')).not.toBeNull()
+  })
+
+  it('再マウントしてもレス数が変わらない（F5 相当）', () => {
+    const first = renderAt('/forum/t1')
+    const before = document.querySelectorAll('.res-item').length
+    expect(before).toBeGreaterThan(1)
+    first.unmount()
+    const second = renderAt('/forum/t1')
+    expect(document.querySelectorAll('.res-item').length).toBe(before)
+    second.unmount()
+  })
+
+  it('mergeThreadList: 一覧に posts が無くても既取得のレスを消さない', async () => {
+    const { mergeThreadList } = await import('../hooks/useForum')
+    const withPosts = {
+      id: 't1',
+      posts: [{ id: 'p1', number: 2 }],
+      title: '旧',
+    } as unknown as Parameters<typeof mergeThreadList>[0][number]
+    // 一覧レスポンス相当: posts を持たない
+    const fromList = { id: 't1', title: '新' } as unknown as typeof withPosts
+    const merged = mergeThreadList([withPosts], [fromList])
+    expect(merged).toHaveLength(1)
+    expect(merged[0].title).toBe('新') // 本体は新しい方で更新される
+    expect(merged[0].posts).toHaveLength(1) // レスは維持される
+  })
+
+  it('mergeThreadList: 一覧に含まれない詳細取得済みスレは残す（直リンク対策）', async () => {
+    const { mergeThreadList } = await import('../hooks/useForum')
+    const deepLinked = {
+      id: 'tX',
+      posts: [{ id: 'p9', number: 2 }],
+    } as unknown as Parameters<typeof mergeThreadList>[0][number]
+    const other = { id: 't1' } as unknown as typeof deepLinked
+    const merged = mergeThreadList([deepLinked], [other])
+    expect(merged.map((t) => t.id).sort()).toEqual(['t1', 'tX'])
+  })
+})

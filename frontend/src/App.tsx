@@ -12,6 +12,7 @@ import GuidePage from './pages/GuidePage'
 import QAPage from './pages/QAPage'
 import ForumPage from './pages/ForumPage'
 import { DocsProvider } from './hooks/useDocs'
+import { ForumProvider } from './hooks/useForum'
 import { AppProvider, useApp } from './store'
 
 function AuthedApp() {
@@ -38,30 +39,32 @@ function AuthedApp() {
 
   return (
     <DocsProvider>
-      <div className="app-shell">
-        <Header />
-        <main>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/tools/new" element={<ToolFormPage />} />
-            <Route path="/tools/:id" element={<ToolDetailPage />} />
-            <Route path="/tools/:id/edit" element={<ToolFormPage />} />
-            <Route path="/mypage" element={<MyPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/admin/dashboard" element={<DashboardPage />} />
-            <Route path="/admin/users" element={<AdminUsersPage />} />
-            <Route path="/guide" element={<GuidePage />} />
-            <Route path="/guide/:slug" element={<GuidePage />} />
-            <Route path="/guide/:slug/:action" element={<GuidePage />} />
-            <Route path="/qa" element={<QAPage />} />
-            <Route path="/qa/:id" element={<QAPage />} />
-            <Route path="/qa/:id/:action" element={<QAPage />} />
-            <Route path="/forum" element={<ForumPage />} />
-            <Route path="/forum/:id" element={<ForumPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </main>
-      </div>
+      <ForumProvider>
+        <div className="app-shell">
+          <Header />
+          <main>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/tools/new" element={<ToolFormPage />} />
+              <Route path="/tools/:id" element={<ToolDetailPage />} />
+              <Route path="/tools/:id/edit" element={<ToolFormPage />} />
+              <Route path="/mypage" element={<MyPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/admin/dashboard" element={<DashboardPage />} />
+              <Route path="/admin/users" element={<AdminUsersPage />} />
+              <Route path="/guide" element={<GuidePage />} />
+              <Route path="/guide/:slug" element={<GuidePage />} />
+              <Route path="/guide/:slug/:action" element={<GuidePage />} />
+              <Route path="/qa" element={<QAPage />} />
+              <Route path="/qa/:id" element={<QAPage />} />
+              <Route path="/qa/:id/:action" element={<QAPage />} />
+              <Route path="/forum" element={<ForumPage />} />
+              <Route path="/forum/:id" element={<ForumPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </main>
+        </div>
+      </ForumProvider>
     </DocsProvider>
   )
 }
