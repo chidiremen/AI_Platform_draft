@@ -14,7 +14,7 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient, APITestCase
 
-from tools.models import AccessRequest, Tool
+from tools.models import AccessRequest, AspiceProcess, Like, Tool
 from tools import notifications
 
 User = get_user_model()
@@ -540,3 +540,79 @@ class AccessRequestDeleteTests(APITestCase):
         res = token_client(self.author).delete(f"/api/access-requests/{req.id}/")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertTrue(AccessRequest.objects.filter(pk=req.pk).exists())
+
+
+class SeedToolsCommandTests(APITestCase):
+    """seed_tools コマンド（実APIモードのカタログが空になるのを防ぐ）。"""
+
+    def _run(self, *args):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        out = StringIO()
+        call_command("seed_tools", *args, stdout=out, stderr=StringIO())
+        return out.getvalue()
+
+    def test_requires_users(self):
+        User.objects.all().delete()
+        out = self._run()
+        self.assertIn("seed_data", out)
+        self.assertEqual(Tool.objects.count(), 0)
+
+    def test_creates_thirteen_tools(self):
+        User.objects.create_user(username="seeder", password="pw", role="admin")
+        self._run()
+        self.assertEqual(Tool.objects.count(), 13)
+        # 主要フィールドが埋まっていること
+        t = Tool.objects.get(title="A-SPICE要件トレーサビリティチェッカー")
+        self.assertTrue(t.summary)
+        self.assertTrue(t.readme)
+        self.assertEqual(t.tool_type, "copilot_agent")
+        self.assertTrue(t.access_url)
+
+    def test_is_idempotent(self):
+        User.objects.create_user(username="seeder2", password="pw", role="admin")
+        self._run()
+        self._run()
+        self.assertEqual(Tool.objects.count(), 13)
+
+    def test_links_aspice_processes_when_present(self):
+        User.objects.create_user(username="seeder3", password="pw", role="admin")
+        AspiceProcess.objects.get_or_create(
+            id="SWE.1",
+            defaults={
+                "name": "ソフトウェア要件分析",
+                "category": "SWE",
+                "v_model_position": "left",
+                "display_order": 1,
+            },
+        )
+        self._run()
+        t = Tool.objects.get(title="A-SPICE要件トレーサビリティチェッカー")
+        self.assertIn("SWE.1", [p.id for p in t.aspice_processes.all()])
+
+    def test_with_metrics_populates_dashboard_data(self):
+        from metrics.models import ActivityLog
+
+        for i in range(4):
+            User.objects.create_user(username=f"mu{i}", password="pw", role="member")
+        self._run("--with-metrics")
+        self.assertGreater(Like.objects.count(), 0)
+        self.assertGreater(AccessRequest.objects.count(), 0)
+        self.assertGreater(ActivityLog.objects.count(), 0)
+        # ファネルの各段が 0 にならないこと（download は zip ツールのみなので除く）
+        for action in ("impression", "view", "readme_scroll"):
+            self.assertGreater(
+                ActivityLog.objects.filter(action=action).count(), 0, action
+            )
+
+    def test_reset_recreates(self):
+        User.objects.create_user(username="seeder4", password="pw", role="admin")
+        self._run()
+        Tool.objects.filter(title="Teams会議リアルタイム要約Bot").update(summary="改変")
+        self._run("--reset")
+        self.assertEqual(Tool.objects.count(), 13)
+        self.assertNotEqual(
+            Tool.objects.get(title="Teams会議リアルタイム要約Bot").summary, "改変"
+        )

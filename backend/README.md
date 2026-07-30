@@ -4,9 +4,12 @@ Django 5 + Django REST Framework backend for the internal "AI Tool Catalog"
 platform (Panasonic Automotive Systems). Provides the catalog API, like /
 access-request actions, activity logging, and role-based dashboards.
 
-> Note: the React frontend (`../frontend`) currently runs on **mock data**.
-> Wiring the frontend to this API is a later step — this backend is the
-> scaffold it will eventually call.
+> The React frontend (`../frontend`) can run in either mode:
+> **mock**（`VITE_USE_MOCK=true`／バックエンド不要）と
+> **実API**（`VITE_USE_MOCK=false`／この API に接続）。
+> 実APIモードで DB が空だとカタログが空になり、いいね・ダッシュボードの数字も
+> すべて 0 になるため、下記の `seed_*` コマンドでデモデータを投入しておくと
+> モードを切り替えても見え方が揃う。
 
 ## Requirements
 
@@ -34,6 +37,16 @@ python manage.py migrate
 
 # 5. Seed A-SPICE processes + demo users (optional)
 python manage.py seed_data
+
+# 5b. Seed demo tools so the catalog / dashboard are not empty (optional)
+#     実APIモードで DB が空だとカタログが真っ白になり、いいね・ダッシュボードも
+#     すべて 0 になる。モックと同じ 13 件を投入して見え方を揃える。
+python manage.py seed_tools --with-metrics
+
+# 5c. Seed guide / Q&A / forum demo data (optional)
+python manage.py seed_docs
+python manage.py seed_forum
+python manage.py forum_names --seed
 
 # 6. Create a Django admin superuser (optional; or use seeded `admin`)
 #    createsuperuser で作成したユーザーは自動的に role=admin（組織管理者）として扱われます。
