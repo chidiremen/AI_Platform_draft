@@ -24,6 +24,18 @@ export default function ForumPage() {
 /** 固定ハンドルを覚えておく localStorage キー */
 const FORUM_NAME_KEY = 'aitc_forum_poster_name_v1'
 
+/**
+ * 管理者向け「🔍 投稿者を特定」ボタンを各レスに常時表示するか。
+ *
+ * 匿名掲示板の見た目を保つため、既定では **非表示**。
+ * 機能自体（reveal API・監査ログ・store.revealPoster・特定結果モーダル）は
+ * すべて生きているので、ここを `true` にすればボタンが復活する。
+ * 単発で調べたい場合は Django 管理画面、または直接 API を叩けばよい:
+ *   POST /api/forum/posts/{id}/reveal/
+ *   POST /api/forum/threads/{id}/reveal/
+ */
+const SHOW_REVEAL_BUTTON: boolean = false
+
 /** 管理者の「投稿者を特定」モーダルの状態 */
 interface RevealState {
   loading: boolean
@@ -354,7 +366,9 @@ function ThreadView({ threadId }: { threadId: string }) {
           isHandle={t.isHandle}
           posterId={t.posterId}
           onReveal={
-            store.isAdmin ? () => doReveal('thread', t.id, t.displayName) : undefined
+            SHOW_REVEAL_BUTTON && store.isAdmin
+              ? () => doReveal('thread', t.id, t.displayName)
+              : undefined
           }
           createdAt={t.createdAt}
           body={t.body}
@@ -392,7 +406,9 @@ function ThreadView({ threadId }: { threadId: string }) {
             isHandle={p.isHandle}
             posterId={p.posterId}
             onReveal={
-              store.isAdmin ? () => doReveal('post', p.id, p.displayName) : undefined
+              SHOW_REVEAL_BUTTON && store.isAdmin
+                ? () => doReveal('post', p.id, p.displayName)
+                : undefined
             }
             createdAt={p.createdAt}
             body={p.body}
