@@ -37,6 +37,10 @@ ALLOWED_HOSTS = os.environ.get(
 # External integration (Microsoft Teams notifications for access requests, etc.)
 TEAMS_WEBHOOK_URL = os.environ.get("TEAMS_WEBHOOK_URL", "")
 
+# フィードバックメールの宛先（カンマ区切り）。未設定なら admin/tool_admin の
+# メールアドレスを宛先にする。送信自体はクライアントの mailto:（Outlook 等）。
+FEEDBACK_TO_EMAIL = os.environ.get("FEEDBACK_TO_EMAIL", "")
+
 # --------------------------------------------------------------------------- #
 # Applications
 # --------------------------------------------------------------------------- #
@@ -56,6 +60,7 @@ INSTALLED_APPS = [
     "tools",
     "metrics",
     "docs",
+    "forum",
 ]
 
 MIDDLEWARE = [

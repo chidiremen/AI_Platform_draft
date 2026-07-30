@@ -856,3 +856,193 @@ describe('Q&A', () => {
     ).toBeInTheDocument()
   })
 })
+
+describe('アイデアフォーラム（2ch風）', () => {
+  it('スレ一覧にシードスレッドが並ぶ', () => {
+    renderAt('/forum')
+    expect(
+      screen.getByRole('heading', { name: /🧵 アイデアフォーラム/ }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/議事録から自動でA-SPICE成果物のドラフト作らせたい/),
+    ).toBeInTheDocument()
+    // 固定スレは先頭に来る（📌 が付く）
+    expect(document.querySelector('.thread-row.pinned')).not.toBeNull()
+  })
+
+  it('検索でスレッドが絞り込まれる', () => {
+    renderAt('/forum')
+    fireEvent.change(screen.getByPlaceholderText(/スレタイ・本文・タグを検索/), {
+      target: { value: 'CANログ' },
+    })
+    expect(screen.getByText(/CANログをいい感じに要約/)).toBeInTheDocument()
+    expect(
+      screen.queryByText(/議事録から自動でA-SPICE/),
+    ).not.toBeInTheDocument()
+  })
+
+  it('板（カテゴリ）で絞り込める', () => {
+    renderAt('/forum?category=share')
+    expect(screen.getByText(/MISRA-Cレビューのプロンプト/)).toBeInTheDocument()
+    expect(screen.queryByText(/CANログをいい感じに要約/)).not.toBeInTheDocument()
+  })
+
+  it('👍 ボタンで投票数が増える', () => {
+    renderAt('/forum')
+    const row = screen
+      .getByText(/CANログをいい感じに要約/)
+      .closest('.thread-row') as HTMLElement
+    const voteBtn = within(row).getByTitle('ほしい！')
+    expect(voteBtn).toHaveTextContent('9')
+    fireEvent.click(voteBtn)
+    expect(voteBtn).toHaveTextContent('10')
+  })
+
+  it('スレ詳細でレスが番号付きで並び、ID が表示される', () => {
+    renderAt('/forum/t1')
+    // 1レス目 = スレ本文
+    const res1 = document.getElementById('res-1') as HTMLElement
+    expect(res1).not.toBeNull()
+    expect(within(res1).getByText('鈴木花子')).toBeInTheDocument()
+    // ID:xxxxxxxx 表記
+    expect(res1.querySelector('.res-id')?.textContent).toMatch(/^ID:[0-9a-f]{8}$/)
+    // レス 2〜4 が存在
+    expect(document.getElementById('res-2')).not.toBeNull()
+    expect(document.getElementById('res-4')).not.toBeNull()
+  })
+
+  it('>>2 がレス参照リンクとして描画される', () => {
+    renderAt('/forum/t1')
+    // res-3 の本文に >>2 が含まれる
+    const res3 = document.getElementById('res-3') as HTMLElement
+    const ref = within(res3).getByText('>>2')
+    expect(ref).toHaveClass('res-ref')
+  })
+
+  it('>>N にホバーすると参照先レスがポップアップする', () => {
+    renderAt('/forum/t1')
+    const res3 = document.getElementById('res-3') as HTMLElement
+    const ref = within(res3).getByText('>>2')
+    // ホバー前はポップアップなし
+    expect(document.querySelector('.res-ref-popup')).toBeNull()
+    fireEvent.mouseEnter(ref.parentElement as HTMLElement)
+    const popup = document.querySelector('.res-ref-popup') as HTMLElement
+    expect(popup).not.toBeNull()
+    // 参照先(>>2)の本文が入っている
+    expect(popup.textContent).toContain('毎週2hくらい溶けてる')
+  })
+
+  it('レス番号クリックで返信欄に >>N が挿入される', () => {
+    renderAt('/forum/t1')
+    const res2 = document.getElementById('res-2') as HTMLElement
+    fireEvent.click(within(res2).getByTitle('このレスに返信'))
+    const textarea = screen.getByPlaceholderText(/本文を入力/) as HTMLTextAreaElement
+    expect(textarea.value).toContain('>>2')
+  })
+
+  it('レスを書き込むと一覧に追加される', async () => {
+    renderAt('/forum/t1')
+    fireEvent.change(screen.getByPlaceholderText(/本文を入力/), {
+      target: { value: 'テスト書き込み' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '書き込む' }))
+    expect(await screen.findByText('テスト書き込み')).toBeInTheDocument()
+    // 新しいレスは番号 5（既存 1..4 の次）
+    expect(document.getElementById('res-5')).not.toBeNull()
+  })
+
+  it('スレッドを立てるボタンでモーダルが開く', () => {
+    renderAt('/forum')
+    fireEvent.click(screen.getByRole('button', { name: /スレッドを立てる/ }))
+    expect(
+      screen.getByRole('heading', { name: /新しいスレッドを立てる/ }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByPlaceholderText(/議事録から自動でA-SPICE/),
+    ).toBeInTheDocument()
+  })
+
+  it('モーダルからスレッドを作成すると詳細に遷移する', async () => {
+    renderAt('/forum')
+    fireEvent.click(screen.getByRole('button', { name: /スレッドを立てる/ }))
+    fireEvent.change(screen.getByPlaceholderText(/議事録から自動でA-SPICE/), {
+      target: { value: '新しいアイデアスレ' },
+    })
+    const modal = document.querySelector('.modal') as HTMLElement
+    fireEvent.change(modal.querySelector('textarea') as HTMLElement, {
+      target: { value: '本文です' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'スレッドを立てる' }))
+    expect(
+      await screen.findByRole('heading', { name: '新しいアイデアスレ' }),
+    ).toBeInTheDocument()
+  })
+
+  it('スレ主は編集・削除・レス停止ができる', () => {
+    // t3 は田中太郎（デフォルトのログインユーザー）のスレ
+    renderAt('/forum/t3')
+    const res1 = document.getElementById('res-1') as HTMLElement
+    expect(within(res1).getByRole('button', { name: '編集' })).toBeInTheDocument()
+    expect(within(res1).getByRole('button', { name: '削除' })).toBeInTheDocument()
+    expect(within(res1).getByRole('button', { name: 'レス停止' })).toBeInTheDocument()
+  })
+
+  it('他人のスレでは編集・削除ボタンが出ない（メンバー）', () => {
+    seedSession('yamada') // 山田次郎: t1〜t4 のスレ主ではない
+    renderAt('/forum/t1')
+    const res1 = document.getElementById('res-1') as HTMLElement
+    expect(within(res1).queryByRole('button', { name: '編集' })).not.toBeInTheDocument()
+    expect(within(res1).queryByRole('button', { name: '削除' })).not.toBeInTheDocument()
+  })
+})
+
+describe('メールフィードバック（Outlook 起動）', () => {
+  it('ツール詳細のボタンでフィードバックモーダルが開く', () => {
+    renderAt('/tools/1')
+    fireEvent.click(screen.getByRole('button', { name: /フィードバックを送る/ }))
+    expect(
+      screen.getByRole('heading', { name: /このツールへのフィードバック/ }),
+    ).toBeInTheDocument()
+    // この画面から直接送信しない旨の注意書き
+    expect(screen.getByText(/この画面から直接送信はされません/)).toBeInTheDocument()
+  })
+
+  it('登録者の宛先が初期選択され、メールアドレスが表示される', () => {
+    renderAt('/tools/1') // tool 1 の author は田中太郎
+    fireEvent.click(screen.getByRole('button', { name: /フィードバックを送る/ }))
+    expect(screen.getByText(/登録者: 田中太郎/)).toBeInTheDocument()
+    expect(screen.getByText('tanaka@example.com')).toBeInTheDocument()
+  })
+
+  it('運営（管理者）宛に切り替えると管理者のメールになる', () => {
+    renderAt('/tools/1')
+    fireEvent.click(screen.getByRole('button', { name: /フィードバックを送る/ }))
+    fireEvent.click(screen.getByRole('button', { name: /運営（管理者）/ }))
+    // admin/tool_admin のメール（田中=admin, 佐藤=tool_admin）
+    const line = document.querySelector('.feedback-to-line') as HTMLElement
+    expect(line.textContent).toContain('tanaka@example.com')
+    expect(line.textContent).toContain('sato@example.com')
+  })
+
+  it('件名・本文が空だと Outlook で開くボタンが無効', () => {
+    renderAt('/tools/1')
+    fireEvent.click(screen.getByRole('button', { name: /フィードバックを送る/ }))
+    const sendBtn = screen.getByRole('button', { name: /Outlook で開く/ })
+    // 初期値で件名・本文が入っているので有効
+    expect(sendBtn).not.toBeDisabled()
+    // 件名を空にすると無効
+    fireEvent.change(
+      screen.getByPlaceholderText('例: 〇〇ツールについての改善提案'),
+      { target: { value: '' } },
+    )
+    expect(sendBtn).toBeDisabled()
+  })
+
+  it('ヘッダーの ✉️ から運営宛フィードバックが開ける', () => {
+    renderAt('/')
+    fireEvent.click(screen.getByTitle('運営にメールでフィードバック'))
+    expect(
+      screen.getByRole('heading', { name: /運営へのフィードバック/ }),
+    ).toBeInTheDocument()
+  })
+})

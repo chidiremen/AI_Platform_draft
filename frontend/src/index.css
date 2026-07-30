@@ -2295,3 +2295,403 @@ button.shot {
   font-size: 13px;
   color: var(--text-muted);
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+ *  アイデアフォーラム（2ch 風）
+ *  ダークブルー基調に合わせつつ、等幅・行間狭め・レス番号でレトロ感を出す
+ * ══════════════════════════════════════════════════════════════════════ */
+
+.forum-page {
+  max-width: 1080px;
+}
+.forum-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.forum-crumb {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+.forum-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--bg-800);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  margin: 16px 0 12px;
+}
+.forum-search {
+  max-width: 460px;
+}
+.forum-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.forum-count {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+/* ── スレ一覧 ── */
+.thread-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-800);
+}
+.thread-row {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13.5px;
+}
+.thread-row:last-child {
+  border-bottom: none;
+}
+.thread-row:hover {
+  background: rgba(79, 157, 222, 0.05);
+}
+.thread-row.pinned {
+  background: rgba(224, 164, 88, 0.06);
+}
+.thread-num {
+  color: var(--text-dim);
+  font-family: 'Menlo', 'Consolas', monospace;
+  min-width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.thread-main {
+  min-width: 0;
+  flex: 1;
+}
+.thread-title {
+  color: var(--accent-bright);
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-block;
+  line-height: 1.4;
+}
+.thread-title:hover {
+  text-decoration: underline;
+}
+.thread-pin {
+  margin-right: 4px;
+}
+.thread-res-count {
+  color: var(--text-dim);
+  font-weight: 400;
+  margin-left: 6px;
+  font-family: 'Menlo', 'Consolas', monospace;
+  font-size: 12px;
+}
+.thread-closed {
+  color: var(--rose);
+  font-size: 11px;
+  margin-left: 6px;
+}
+.thread-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.thread-board {
+  background: rgba(184, 138, 214, 0.14);
+  color: var(--purple);
+  padding: 1px 7px;
+  border-radius: 8px;
+}
+.thread-vote {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 11.5px;
+  transition: all 0.12s;
+}
+.thread-vote:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+.thread-vote.voted {
+  background: rgba(224, 164, 88, 0.16);
+  border-color: var(--amber);
+  color: var(--amber);
+  font-weight: 700;
+}
+
+/* ── スレ詳細 ── */
+.thread-view-title {
+  font-size: 22px;
+  margin: 0 0 6px;
+  line-height: 1.35;
+}
+.thread-view-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+/* ── レス（2ch 風） ── */
+.res-list {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: var(--bg-800);
+  overflow: hidden;
+}
+.res-item {
+  padding: 10px 14px 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.res-item:last-child {
+  border-bottom: none;
+}
+.res-item.op {
+  background: rgba(79, 157, 222, 0.04);
+}
+.res-item.res-flash {
+  animation: res-flash-anim 1.2s ease-out;
+}
+@keyframes res-flash-anim {
+  0% {
+    background: rgba(224, 164, 88, 0.28);
+  }
+  100% {
+    background: transparent;
+  }
+}
+.res-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  margin-bottom: 5px;
+  font-family: 'Menlo', 'Consolas', monospace;
+}
+.res-number {
+  background: transparent;
+  border: none;
+  color: var(--teal);
+  font-weight: 700;
+  font-family: inherit;
+  font-size: 12.5px;
+  padding: 0 2px;
+  cursor: pointer;
+}
+.res-number:hover {
+  text-decoration: underline;
+}
+.res-name-label {
+  color: var(--text-dim);
+}
+.res-name {
+  color: #6ee7a8;
+  font-weight: 700;
+}
+.res-op-badge {
+  background: rgba(79, 157, 222, 0.18);
+  color: var(--accent-bright);
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.res-date {
+  color: var(--text-dim);
+}
+.res-id {
+  color: var(--text-dim);
+}
+.res-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+.res-action {
+  background: transparent;
+  border: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  border-radius: 4px;
+  font-size: 10.5px;
+  padding: 1px 6px;
+  font-family: inherit;
+}
+.res-action:hover {
+  border-color: var(--accent);
+  color: var(--accent-bright);
+}
+.res-action.danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.res-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.65;
+  font-size: 13.5px;
+  padding-left: 22px;
+  color: var(--text);
+}
+.res-code {
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  overflow-x: auto;
+  font-family: 'Menlo', 'Consolas', monospace;
+  font-size: 12.5px;
+  margin: 8px 0;
+  white-space: pre;
+}
+
+/* >>N 参照 */
+.res-ref-wrap {
+  position: relative;
+}
+.res-ref {
+  color: var(--amber);
+  text-decoration: none;
+  font-weight: 700;
+}
+.res-ref:hover {
+  text-decoration: underline;
+}
+.res-ref-popup {
+  position: absolute;
+  left: 0;
+  top: 1.5em;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 280px;
+  max-width: 460px;
+  padding: 10px 12px;
+  background: var(--bg-700);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  white-space: pre-wrap;
+  font-weight: 400;
+}
+.res-ref-popup-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.res-ref-popup-head {
+  font-size: 11px;
+  color: var(--teal);
+  font-family: 'Menlo', 'Consolas', monospace;
+}
+.res-ref-popup-body {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+/* ── レス投稿フォーム ── */
+.res-form {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: var(--bg-800);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+}
+.res-form-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.res-form-head .dim {
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+.res-textarea {
+  font-family: 'Menlo', 'Consolas', 'Hiragino Sans', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.res-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+.res-edit {
+  padding-left: 22px;
+}
+
+/* ── スレ作成モーダル ── */
+.thread-modal-note {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin: 0 0 14px;
+  line-height: 1.6;
+}
+.thread-cat-picker {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── フィードバックモーダル（mailto: で Outlook 起動） ── */
+.feedback-note {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.65;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  background: rgba(79, 157, 222, 0.07);
+  border-left: 3px solid var(--accent-bright);
+  border-radius: 4px;
+}
+.feedback-target {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.feedback-to-line {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+.feedback-to-line code {
+  background: rgba(79, 157, 222, 0.1);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.feedback-warn {
+  color: var(--amber);
+  font-size: 12px;
+  line-height: 1.6;
+  display: block;
+}

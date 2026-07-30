@@ -8,6 +8,7 @@ import RequestModal from '../components/RequestModal'
 import ConfirmModal from '../components/ConfirmModal'
 import Lightbox from '../components/Lightbox'
 import CommentSection from '../components/CommentSection'
+import FeedbackModal from '../components/FeedbackModal'
 import { TOOL_TYPE_MAP } from '../data/toolTypes'
 import { useReadmeScroll } from '../hooks/useActivity'
 
@@ -23,8 +24,10 @@ export default function ToolDetailPage() {
     recordActivity,
     canEdit,
     deleteTool,
+    users,
   } = useApp()
   const [showModal, setShowModal] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
@@ -206,6 +209,14 @@ export default function ToolDetailPage() {
                 🍴 フォークして改善版を登録
               </button>
 
+              <button
+                className="btn btn-block"
+                onClick={() => setShowFeedback(true)}
+                title="登録者または運営にメールでフィードバック"
+              >
+                ✉️ フィードバックを送る
+              </button>
+
               {canEdit(tool) && (
                 <div className="owner-actions">
                   <div className="owner-actions-label">登録者・管理者メニュー</div>
@@ -285,6 +296,21 @@ export default function ToolDetailPage() {
           screenshots={tool.screenshots}
           initialIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
+        />
+      )}
+
+      {showFeedback && (
+        <FeedbackModal
+          title="✉️ このツールへのフィードバック"
+          // 実APIモードは serializer の author.email、モックは users から解決
+          defaultTo={
+            tool.authorEmail ??
+            users.find((u) => u.name === tool.author)?.email
+          }
+          defaultToLabel={`👤 登録者: ${tool.author}`}
+          subject={`[AIツールカタログ] ${tool.title} について`}
+          body={`「${tool.title}」について連絡します。\n\n`}
+          onClose={() => setShowFeedback(false)}
         />
       )}
 

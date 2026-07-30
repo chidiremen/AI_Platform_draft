@@ -47,6 +47,8 @@ export interface Tool {
   /** スクリーンショット一覧 */
   screenshots?: ScreenshotInfo[]
   author: string
+  /** 登録者のメールアドレス（フィードバックメールの宛先に使う） */
+  authorEmail?: string
   forkedFrom?: string // フォーク元ツール id
   createdAt: string
   updatedAt?: string
@@ -135,6 +137,45 @@ export interface Question {
   viewCount: number
   answerCount: number
   answers?: Answer[]
+  createdAt: string
+  updatedAt: string
+}
+
+// ── フォーラム（2ch 風スレッド掲示板） ──
+
+export type ForumCategory = 'idea' | 'discussion' | 'share' | 'other'
+
+/** フォーラムのレス1件（スレ本文は number=1 として仮想的に扱う） */
+export interface ForumPost {
+  id: string
+  threadId: string
+  /** スレッド内のレス番号（>>N の N）。スレ本文は 1 */
+  number: number
+  body: string
+  author: string
+  /** 2ch 風の匿名ID（日付+ユーザー+スレで決まる 8桁） */
+  posterId: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ForumThread {
+  id: string
+  title: string
+  body: string
+  category: ForumCategory
+  tags: string[]
+  author: string
+  posterId: string
+  isPinned: boolean
+  isClosed: boolean
+  viewCount: number
+  postCount: number
+  voteCount: number
+  votedByMe: boolean
+  /** 詳細取得時のみ入る */
+  posts?: ForumPost[]
+  lastPostedAt: string | null
   createdAt: string
   updatedAt: string
 }

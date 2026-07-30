@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from rest_framework import generics, status
 from rest_framework.authtoken.models import Token
@@ -170,3 +171,29 @@ class AdminUserDetailView(generics.RetrieveUpdateDestroyAPIView):
             )
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class FeedbackRecipientsView(APIView):
+    """フィードバックメールの宛先を返す。
+
+    フロントは受け取ったアドレスで ``mailto:`` を組み立て、ユーザーの既定
+    メールクライアント（Outlook 等）を起動する。サーバからは送信しない。
+
+    優先順位:
+      1. 環境変数 ``FEEDBACK_TO_EMAIL``（カンマ区切りで複数可）
+      2. admin / tool_admin ロールのユーザーのメールアドレス
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        configured = (getattr(settings, "FEEDBACK_TO_EMAIL", "") or "").strip()
+        if configured:
+            to = [a.strip() for a in configured.split(",") if a.strip()]
+            return Response({"to": to, "source": "setting"})
+        to = list(
+            User.objects.filter(role__in=list(User.ADMIN_ROLES))
+            .exclude(email="")
+            .values_list("email", flat=True)
+        )
+        return Response({"to": to, "source": "admins"})

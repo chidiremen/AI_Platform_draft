@@ -9,6 +9,9 @@ import type {
   CommentType,
   DocCategory,
   DocKind,
+  ForumCategory,
+  ForumPost,
+  ForumThread,
   GuideArticle,
   Question,
   Tool,
@@ -229,6 +232,7 @@ export function mapTool(d: ToolDTO): Tool {
       displayOrder: s.display_order,
     })),
     author: d.author?.display_name || d.author?.username || '不明',
+    authorEmail: d.author?.email || undefined,
     forkedFrom: d.forked_from ?? undefined,
     createdAt: (d.created_at ?? '').slice(0, 10),
     updatedAt: d.updated_at ? d.updated_at.slice(0, 10) : undefined,
@@ -983,4 +987,192 @@ export async function uploadDocAttachment(file: File | Blob): Promise<string> {
     body: fd,
   })
   return res.url
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Forum（2ch 風スレッド掲示板）
+// ─────────────────────────────────────────────────────────────────────
+
+interface ForumPostDTO {
+  id: string
+  thread: string
+  number: number
+  body: string
+  author: UserDTO | null
+  poster_id: string
+  created_at: string
+  updated_at: string
+}
+interface ForumThreadDTO {
+  id: string
+  title: string
+  body: string
+  category: ForumCategory
+  tags: string
+  author: UserDTO | null
+  poster_id: string
+  is_pinned: boolean
+  is_closed: boolean
+  view_count: number
+  post_count: number
+  vote_count: number
+  voted_by_me: boolean
+  posts?: ForumPostDTO[] | null
+  last_posted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+function mapForumPost(d: ForumPostDTO): ForumPost {
+  return {
+    id: d.id,
+    threadId: d.thread,
+    number: d.number,
+    body: d.body,
+    author: authorOf(d.author),
+    posterId: d.poster_id,
+    createdAt: d.created_at,
+    updatedAt: d.updated_at,
+  }
+}
+function mapForumThread(d: ForumThreadDTO): ForumThread {
+  return {
+    id: d.id,
+    title: d.title,
+    body: d.body,
+    category: d.category,
+    tags: d.tags ? d.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+    author: authorOf(d.author),
+    posterId: d.poster_id,
+    isPinned: d.is_pinned,
+    isClosed: d.is_closed,
+    viewCount: d.view_count,
+    postCount: d.post_count,
+    voteCount: d.vote_count,
+    votedByMe: d.voted_by_me,
+    posts: d.posts ? d.posts.map(mapForumPost) : undefined,
+    lastPostedAt: d.last_posted_at,
+    createdAt: d.created_at,
+    updatedAt: d.updated_at,
+  }
+}
+
+export type ForumSort = 'latest' | 'new' | 'votes' | 'posts'
+
+export async function listThreads(params?: {
+  q?: string
+  category?: ForumCategory
+  mine?: boolean
+  sort?: ForumSort
+}): Promise<ForumThread[]> {
+  const qs = new URLSearchParams()
+  if (params?.q) qs.set('q', params.q)
+  if (params?.category) qs.set('category', params.category)
+  if (params?.mine) qs.set('mine', 'true')
+  if (params?.sort) qs.set('sort', params.sort)
+  const suffix = qs.toString() ? `?${qs}` : ''
+  const r = await apiFetch<Paginated<ForumThreadDTO>>(`/forum/threads/${suffix}`)
+  return r.results.map(mapForumThread)
+}
+
+export async function getThread(id: string): Promise<ForumThread> {
+  return mapForumThread(await apiFetch<ForumThreadDTO>(`/forum/threads/${id}/`))
+}
+
+export interface ThreadInput {
+  title: string
+  body: string
+  category: ForumCategory
+  tags?: string
+}
+
+export async function createThread(input: ThreadInput): Promise<ForumThread> {
+  return mapForumThread(
+    await apiFetch<ForumThreadDTO>('/forum/threads/', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: input.title,
+        body: input.body,
+        category: input.category,
+        tags: input.tags ?? '',
+      }),
+    }),
+  )
+}
+
+export async function updateThread(
+  id: string,
+  input: Partial<ThreadInput>,
+): Promise<ForumThread> {
+  const body: Record<string, unknown> = {}
+  if (input.title != null) body.title = input.title
+  if (input.body != null) body.body = input.body
+  if (input.category != null) body.category = input.category
+  if (input.tags != null) body.tags = input.tags
+  return mapForumThread(
+    await apiFetch<ForumThreadDTO>(`/forum/threads/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  )
+}
+
+export async function deleteThread(id: string): Promise<void> {
+  await apiFetch(`/forum/threads/${id}/`, { method: 'DELETE' })
+}
+
+export async function voteThread(id: string): Promise<ForumThread> {
+  return mapForumThread(
+    await apiFetch<ForumThreadDTO>(`/forum/threads/${id}/vote/`, { method: 'POST' }),
+  )
+}
+
+export async function toggleThreadClosed(id: string): Promise<ForumThread> {
+  return mapForumThread(
+    await apiFetch<ForumThreadDTO>(`/forum/threads/${id}/toggle-closed/`, {
+      method: 'POST',
+    }),
+  )
+}
+
+export async function toggleThreadPinned(id: string): Promise<ForumThread> {
+  return mapForumThread(
+    await apiFetch<ForumThreadDTO>(`/forum/threads/${id}/toggle-pinned/`, {
+      method: 'POST',
+    }),
+  )
+}
+
+export async function createForumPost(
+  threadId: string,
+  body: string,
+): Promise<ForumPost> {
+  return mapForumPost(
+    await apiFetch<ForumPostDTO>('/forum/posts/', {
+      method: 'POST',
+      body: JSON.stringify({ thread: threadId, body }),
+    }),
+  )
+}
+
+export async function updateForumPost(id: string, body: string): Promise<ForumPost> {
+  return mapForumPost(
+    await apiFetch<ForumPostDTO>(`/forum/posts/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify({ body }),
+    }),
+  )
+}
+
+export async function deleteForumPost(id: string): Promise<void> {
+  await apiFetch(`/forum/posts/${id}/`, { method: 'DELETE' })
+}
+
+
+/** フィードバックメールの宛先（サーバは送信せず、宛先だけを返す）。 */
+export async function getFeedbackRecipients(): Promise<{
+  to: string[]
+  source: 'setting' | 'admins'
+}> {
+  return apiFetch('/feedback-recipients/')
 }

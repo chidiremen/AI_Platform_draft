@@ -2,12 +2,14 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { useApp } from '../store'
 import { ROLE_LABELS, isAdminRole } from '../data/users'
+import FeedbackModal from './FeedbackModal'
 
 export default function Header() {
   const navigate = useNavigate()
   const location = useLocation()
   const { currentUser, logout } = useApp()
   const [q, setQ] = useState('')
+  const [showFeedback, setShowFeedback] = useState(false)
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -61,12 +63,23 @@ export default function Header() {
               👤 ユーザー管理
             </Link>
           )}
+          <Link className="btn btn-ghost" to="/forum">
+            🧵 フォーラム
+          </Link>
           <Link className="btn btn-ghost" to="/mypage">
             マイページ
           </Link>
           <Link className="btn btn-primary" to="/tools/new">
             ＋ ツール登録
           </Link>
+
+          <button
+            className="btn btn-ghost"
+            onClick={() => setShowFeedback(true)}
+            title="運営にメールでフィードバック"
+          >
+            ✉️
+          </button>
 
           <div className="user-chip" title={currentUser?.email ?? ''}>
             <Link to="/profile" className="user-name user-name-link" title="プロフィール設定">
@@ -88,6 +101,14 @@ export default function Header() {
           </div>
         </nav>
       </div>
+      {showFeedback && (
+        <FeedbackModal
+          title="✉️ 運営へのフィードバック"
+          subject="[AIツールカタログ] フィードバック"
+          body={'プラットフォームについてのご意見・ご要望:\n\n'}
+          onClose={() => setShowFeedback(false)}
+        />
+      )}
     </header>
   )
 }

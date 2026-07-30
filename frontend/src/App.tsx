@@ -10,6 +10,7 @@ import AdminUsersPage from './pages/AdminUsersPage'
 import ProfilePage from './pages/ProfilePage'
 import GuidePage from './pages/GuidePage'
 import QAPage from './pages/QAPage'
+import ForumPage from './pages/ForumPage'
 import { AppProvider, useApp } from './store'
 
 function AuthedApp() {
@@ -53,6 +54,8 @@ function AuthedApp() {
           <Route path="/qa" element={<QAPage />} />
           <Route path="/qa/:id" element={<QAPage />} />
           <Route path="/qa/:id/:action" element={<QAPage />} />
+          <Route path="/forum" element={<ForumPage />} />
+          <Route path="/forum/:id" element={<ForumPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

@@ -11,6 +11,11 @@ urlpatterns = [
     path("me/", views.MeView.as_view(), name="me"),
     path("me/password/", views.MePasswordView.as_view(), name="me-password"),
     path(
+        "feedback-recipients/",
+        views.FeedbackRecipientsView.as_view(),
+        name="feedback-recipients",
+    ),
+    path(
         "admin/users/",
         views.AdminUserListCreateView.as_view(),
         name="admin-users",
