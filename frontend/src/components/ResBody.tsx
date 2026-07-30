@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { scrollIntoViewSafe } from '../utils/scroll'
 
 /**
@@ -117,6 +117,41 @@ function ResRef({
   anchorPrefix: string
 }) {
   const [hover, setHover] = useState(false)
+  const anchorRef = useRef<HTMLAnchorElement | null>(null)
+  const popRef = useRef<HTMLSpanElement | null>(null)
+  /** ポップアップの表示座標（viewport 基準）。null の間は非表示。 */
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+
+  // ポップアップは position:fixed。実寸を測ってから、はみ出す場合は
+  // 左右をクランプし、下に入らなければ上方向へ反転させる。
+  useLayoutEffect(() => {
+    if (!hover) {
+      setPos(null)
+      return
+    }
+    const a = anchorRef.current
+    const pop = popRef.current
+    if (!a || !pop) return
+    const ar = a.getBoundingClientRect()
+    const pr = pop.getBoundingClientRect()
+    const M = 8 // 画面端との余白
+    const GAP = 6 // リンクとポップアップの隙間
+
+    let left = ar.left
+    if (left + pr.width > window.innerWidth - M) {
+      left = window.innerWidth - pr.width - M
+    }
+    if (left < M) left = M
+
+    let top = ar.bottom + GAP
+    if (top + pr.height > window.innerHeight - M) {
+      const above = ar.top - pr.height - GAP
+      // 上にも入らないときは画面内に収まる位置へフォールバック
+      top = above >= M ? above : Math.max(M, window.innerHeight - pr.height - M)
+    }
+    setPos({ top, left })
+  }, [hover])
+
   const targets: number[] = []
   if (to != null && to > from && to - from < 20) {
     for (let n = from; n <= to; n++) targets.push(n)
@@ -141,11 +176,20 @@ function ResRef({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <a href={`#${anchorPrefix}-${from}`} className="res-ref" onClick={jump}>
+      <a
+        ref={anchorRef}
+        href={`#${anchorPrefix}-${from}`}
+        className="res-ref"
+        onClick={jump}
+      >
         {label}
       </a>
       {hover && known.length > 0 && (
-        <span className="res-ref-popup">
+        <span
+          ref={popRef}
+          className={`res-ref-popup${pos ? ' positioned' : ''}`}
+          style={pos ? { top: pos.top, left: pos.left } : undefined}
+        >
           {known.map((n) => (
             <span key={n} className="res-ref-popup-item">
               <span className="res-ref-popup-head">

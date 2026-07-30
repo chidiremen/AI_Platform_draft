@@ -49,37 +49,40 @@ export default function Header() {
         </form>
 
         <nav className="header-nav">
-          <Link className="btn btn-ghost" to="/guide">
-            📚 ガイド
+          {/*
+            ガイド (/guide) は導線を一旦非表示にしている。ページ・ルート・API は
+            そのまま生きているので、URL 直打ちでアクセス可能。復活させるときは
+            この Link のコメントを外すだけでよい。
+              <Link className="btn btn-ghost" to="/guide">📚 ガイド</Link>
+          */}
+          {/* nav-label は狭い画面で非表示になり、絵文字アイコンだけが残る
+              （ヘッダーを常に1行に保つため）。title は畳んだ時のツールチップ用。 */}
+          <Link className="btn btn-ghost" to="/qa" title="このページのQ&A">
+            💬<span className="nav-label">このページのQ&A</span>
           </Link>
-          <Link className="btn btn-ghost" to="/qa">
-            💬 Q&A
+          <Link className="btn btn-ghost" to="/forum" title="アイデアフォーラム">
+            🧵<span className="nav-label">フォーラム</span>
           </Link>
-          <Link className="btn btn-ghost" to="/admin/dashboard">
-            📊 ダッシュボード
+          <Link className="btn btn-ghost" to="/mypage" title="マイページ">
+            🙋<span className="nav-label">マイページ</span>
+          </Link>
+          <Link className="btn btn-ghost" to="/admin/dashboard" title="ダッシュボード">
+            📊<span className="nav-label">ダッシュボード</span>
           </Link>
           {isAdmin && (
-            <Link className="btn btn-ghost" to="/admin/users">
-              👤 ユーザー管理
+            <Link className="btn btn-ghost" to="/admin/users" title="ユーザー管理">
+              👤<span className="nav-label">ユーザー管理</span>
             </Link>
           )}
-          <Link className="btn btn-ghost" to="/forum">
-            🧵 フォーラム
+          <Link className="btn btn-primary" to="/tools/new" title="ツール登録">
+            ＋<span className="nav-label">ツール登録</span>
           </Link>
-          <Link className="btn btn-ghost" to="/mypage">
-            マイページ
-          </Link>
-          <Link className="btn btn-primary" to="/tools/new">
-            ＋ ツール登録
-          </Link>
-
-          <button
-            className="btn btn-ghost"
-            onClick={() => setShowFeedback(true)}
-            title="運営にメールでフィードバック"
-          >
-            ✉️
-          </button>
+          {/*
+            運営へのフィードバック導線も一旦非表示。FeedbackModal / mailto 生成の
+            実装は残してあるので、下のボタンを復活させれば即使える。
+              <button className="btn btn-ghost" onClick={() => setShowFeedback(true)}
+                      title="運営にメールでフィードバック">✉️</button>
+          */}
 
           <div className="user-chip" title={currentUser?.email ?? ''}>
             <Link to="/profile" className="user-name user-name-link" title="プロフィール設定">

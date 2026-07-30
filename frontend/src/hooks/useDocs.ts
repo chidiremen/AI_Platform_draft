@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react'
 import { USE_MOCK } from '../config'
 import * as api from '../api'
 import { useApp } from '../store'
@@ -35,8 +43,15 @@ function savePersisted(key: string, value: unknown) {
   }
 }
 
-/** ガイド/Q&A の共通ストア（App 全体で1つ）。 */
-export function useDocsStore() {
+/**
+ * ガイド/Q&A のストア本体。
+ *
+ * ⚠️ 直接呼ばないこと。この hook は state を「生成」するため、複数箇所から
+ * 呼ぶとコンポーネントごとに別インスタンスができてしまい、ある画面での投稿が
+ * 別の画面に反映されない（例: 質問投稿 → 詳細ページで見つからず白紙）。
+ * 利用側は必ず Context 経由の {@link useDocsStore} を使う。
+ */
+function useDocsStoreState() {
   const { currentUser, toast } = useApp()
   const isAdmin = isAdminRole(currentUser?.role)
 
@@ -101,6 +116,29 @@ export function useDocsStore() {
       }
     },
     [],
+  )
+
+  /**
+   * 指定 ID の質問がローカルに無ければ個別取得して補う。
+   * 実APIモードの一覧はページネーションされるため、2ページ目以降の質問へ
+   * 直接 URL でアクセスすると一覧に含まれない。その場合の救済措置。
+   * 戻り値は「見つかった / 見つからなかった」の判定用。
+   */
+  const ensureQuestion = useCallback(
+    async (id: string): Promise<'found' | 'missing'> => {
+      if (questions.some((q) => q.id === id)) return 'found'
+      if (USE_MOCK) return 'missing'
+      try {
+        const q = await api.getQuestion(id)
+        setQuestions((prev) =>
+          prev.some((x) => x.id === q.id) ? prev : [q, ...prev],
+        )
+        return 'found'
+      } catch {
+        return 'missing'
+      }
+    },
+    [questions],
   )
 
   // ── Guide CRUD ──
@@ -423,10 +461,37 @@ export function useDocsStore() {
     updateQuestion,
     deleteQuestion,
     toggleResolved,
+    ensureQuestion,
     // answer
     addAnswer,
     updateAnswer,
     deleteAnswer,
     acceptAnswer,
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Context — アプリ全体で単一の docs ストアを共有する
+// ─────────────────────────────────────────────────────────────────────
+
+type DocsStore = ReturnType<typeof useDocsStoreState>
+
+const DocsContext = createContext<DocsStore | null>(null)
+
+/** ガイド/Q&A ストアの Provider。App のルート付近で1回だけマウントする。 */
+export function DocsProvider({ children }: { children: ReactNode }) {
+  const value = useDocsStoreState()
+  return createElement(DocsContext.Provider, { value }, children)
+}
+
+/**
+ * ガイド/Q&A ストアを取得する（アプリ全体で共有された単一インスタンス）。
+ * `DocsProvider` の外で呼ぶと例外を投げる。
+ */
+export function useDocsStore(): DocsStore {
+  const ctx = useContext(DocsContext)
+  if (!ctx) {
+    throw new Error('useDocsStore must be used within <DocsProvider>')
+  }
+  return ctx
 }

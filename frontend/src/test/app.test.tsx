@@ -762,7 +762,9 @@ describe('ガイド (docs)', () => {
 describe('Q&A', () => {
   it('Q&A 一覧に既存質問が並ぶ', () => {
     renderAt('/qa')
-    expect(screen.getByRole('heading', { name: '💬 Q&A' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: '💬 このページのQ&A' }),
+    ).toBeInTheDocument()
     expect(
       screen.getByText('ツール登録時に「効果」欄は何を書けばいいですか？'),
     ).toBeInTheDocument()
@@ -1038,11 +1040,63 @@ describe('メールフィードバック（Outlook 起動）', () => {
     expect(sendBtn).toBeDisabled()
   })
 
-  it('ヘッダーの ✉️ から運営宛フィードバックが開ける', () => {
+  it('運営宛フィードバックのヘッダー導線は現在非表示', () => {
+    // 要望により導線のみ撤去（FeedbackModal / mailto 実装は残置）。
+    // 復活させたらこのテストを「開けること」の確認に戻す。
     renderAt('/')
-    fireEvent.click(screen.getByTitle('運営にメールでフィードバック'))
     expect(
-      screen.getByRole('heading', { name: /運営へのフィードバック/ }),
+      screen.queryByTitle('運営にメールでフィードバック'),
+    ).not.toBeInTheDocument()
+  })
+})
+
+describe('回帰: ドキュメントストアの単一インスタンス化', () => {
+  it('質問モーダルから投稿すると、そのまま詳細ページが表示される（白紙にならない）', async () => {
+    renderAt('/qa')
+    fireEvent.click(screen.getAllByRole('button', { name: /❓ 質問する/ })[0])
+    fireEvent.change(screen.getByPlaceholderText(/xxx の使い方が分かりません/), {
+      target: { value: '白紙回帰テストの質問' },
+    })
+    const modal = document.querySelector('.modal') as HTMLElement
+    fireEvent.change(modal.querySelector('textarea') as HTMLElement, {
+      target: { value: '本文' },
+    })
+    fireEvent.click(within(modal).getByRole('button', { name: '投稿' }))
+    // 詳細ページのタイトルとして描画される = ストアが共有されている
+    expect(
+      await screen.findByRole('heading', { name: '白紙回帰テストの質問' }),
     ).toBeInTheDocument()
+  })
+
+  it('存在しない質問IDを開くと案内が出る（白紙にしない）', async () => {
+    renderAt('/qa/does-not-exist-000')
+    expect(
+      await screen.findByText(/指定された質問は見つかりませんでした/),
+    ).toBeInTheDocument()
+  })
+})
+
+describe('ヘッダー導線', () => {
+  it('ガイドのリンクは非表示（ルートは生きている）', () => {
+    renderAt('/')
+    const nav = document.querySelector('.header-nav') as HTMLElement
+    expect(within(nav).queryByText(/ガイド/)).not.toBeInTheDocument()
+    // ルート自体は有効
+    renderAt('/guide')
+    expect(
+      screen.getByRole('heading', { name: /📚 プラットフォーム ガイド/ }),
+    ).toBeInTheDocument()
+  })
+
+  it('Q&A の導線ラベルが「このページのQ&A」になっている', () => {
+    renderAt('/')
+    const nav = document.querySelector('.header-nav') as HTMLElement
+    expect(within(nav).getByTitle('このページのQ&A')).toBeInTheDocument()
+  })
+
+  it('ヘッダーのボタンにはラベル折り返し回避用の nav-label がある', () => {
+    renderAt('/')
+    const nav = document.querySelector('.header-nav') as HTMLElement
+    expect(nav.querySelectorAll('.nav-label').length).toBeGreaterThanOrEqual(5)
   })
 })

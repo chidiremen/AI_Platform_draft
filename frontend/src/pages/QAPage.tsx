@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import DocsSidebar from '../components/DocsSidebar'
 import MarkdownView from '../components/MarkdownView'
@@ -20,10 +20,29 @@ import type { Question } from '../types'
 export default function QAPage() {
   const { id, action } = useParams<{ id?: string; action?: string }>()
   const store = useDocsStore()
-  const { categories, questions, addQuestion } = store
+  const { categories, questions, addQuestion, ensureQuestion } = store
   const navigate = useNavigate()
   const [search] = useSearchParams()
   const [askOpen, setAskOpen] = useState(false)
+  // ローカルに無い質問IDを直リンクで開いたときの取得状態
+  const [lookup, setLookup] = useState<'idle' | 'loading' | 'missing'>('idle')
+
+  const found = !!id && id !== 'new' && questions.some((q) => q.id === id)
+
+  useEffect(() => {
+    if (!id || id === 'new' || found) {
+      setLookup('idle')
+      return
+    }
+    let active = true
+    setLookup('loading')
+    ensureQuestion(id).then((r) => {
+      if (active) setLookup(r === 'found' ? 'idle' : 'missing')
+    })
+    return () => {
+      active = false
+    }
+  }, [id, found, ensureQuestion])
 
   const qaCategories = useMemo(
     () => categories.filter((c) => c.kind === 'qa'),
@@ -60,7 +79,7 @@ export default function QAPage() {
   return (
     <div className="docs-layout">
       <DocsSidebar
-        title="💬 Q&A"
+        title="💬 このページのQ&A"
         categories={qaCategories}
         items={itemsByCategory}
         headerActions={headerActions}
@@ -90,6 +109,17 @@ export default function QAPage() {
           <QuestionEditor mode="edit" questionId={activeQuestion.id} />
         ) : activeQuestion ? (
           <QuestionDetail questionId={activeQuestion.id} />
+        ) : lookup === 'loading' ? (
+          <div className="empty">読み込み中…</div>
+        ) : id && id !== 'new' ? (
+          <div className="empty">
+            指定された質問は見つかりませんでした（削除された可能性があります）。
+            <div style={{ marginTop: 12 }}>
+              <Link to="/qa" className="btn btn-sm">
+                ← Q&A一覧へ戻る
+              </Link>
+            </div>
+          </div>
         ) : (
           <QuestionList onAskClick={() => setAskOpen(true)} />
         )}
@@ -145,7 +175,7 @@ function QuestionList({ onAskClick }: { onAskClick: () => void }) {
 
   return (
     <div>
-      <h1 className="page-title">💬 Q&A</h1>
+      <h1 className="page-title">💬 このページのQ&A</h1>
       <p className="page-sub">
         {activeCat ? (
           <>
@@ -258,7 +288,7 @@ function QuestionDetail({ questionId }: { questionId: string }) {
   return (
     <div className="qa-detail">
       <div className="guide-crumb">
-        <Link to="/qa">💬 Q&A</Link>
+        <Link to="/qa">💬 このページのQ&A</Link>
         {q.categoryName && <span> / {q.categoryName}</span>}
       </div>
 

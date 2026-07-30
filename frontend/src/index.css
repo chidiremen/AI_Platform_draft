@@ -100,8 +100,12 @@ h3 {
 .header-inner {
   display: flex;
   align-items: center;
-  gap: 24px;
-  height: 64px;
+  flex-wrap: nowrap;
+  gap: 16px;
+  min-height: 64px;
+  /* 本文の .container は 1240px 上限だが、ヘッダーはナビ項目が多く
+     1240px では収まらずはみ出す。ヘッダーだけ上限を広げる。 */
+  max-width: 1600px;
 }
 .logo {
   display: flex;
@@ -129,14 +133,68 @@ h3 {
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
 }
 .header-search {
-  flex: 1;
+  flex: 1 1 auto;
   max-width: 460px;
+  /* flex アイテムの既定 min-width:auto を解除しないと、ナビを押し出して
+     ボタンのラベルが折り返してしまう（ヘッダーが2行になる原因） */
+  min-width: 0;
 }
 .header-nav {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: nowrap;
+  gap: 6px;
+  /* ナビは縮ませない。代わりに検索ボックス側を縮める */
+  flex-shrink: 0;
+}
+/* ヘッダー内のボタンはラベルを絶対に折り返さない＆余白を詰める */
+.header-nav .btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.header-nav .user-chip {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* 画面が狭いときは、優先度の低いものから順に畳んでナビを1行に保つ */
+@media (max-width: 1440px) {
+  .header-search {
+    max-width: 260px;
+  }
+}
+@media (max-width: 1300px) {
+  /* ロールはマイページ/プロフィールで確認できるのでヘッダーからは省く */
+  .header-nav .role-pill {
+    display: none;
+  }
+}
+@media (max-width: 1180px) {
+  .header-search {
+    display: none;
+  }
+}
+@media (max-width: 1240px) {
+  /* ラベルを畳んで絵文字アイコンのみにする（1行維持の最後の砦） */
+  .header-nav .nav-label {
+    display: none;
+  }
+  .header-nav .btn {
+    padding: 8px 10px;
+  }
+}
+@media (max-width: 1024px) {
+  /* ロゴは記号だけ残してテキストを省略 */
+  .logo {
+    font-size: 0;
+    gap: 0;
+  }
+  .logo-mark {
+    font-size: 16px;
+  }
 }
 
 /* ── 入力 ── */
@@ -2459,7 +2517,16 @@ button.shot {
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
   background: var(--bg-800);
-  overflow: hidden;
+  /* overflow:hidden は使わない。>>N のホバーポップアップがリスト境界で
+     切り取られて見えなくなるため。角丸は先頭/末尾の子要素側で処理する。 */
+}
+.res-item:first-child {
+  border-top-left-radius: var(--radius);
+  border-top-right-radius: var(--radius);
+}
+.res-item:last-child {
+  border-bottom-left-radius: var(--radius);
+  border-bottom-right-radius: var(--radius);
 }
 .res-item {
   padding: 10px 14px 12px;
@@ -2581,10 +2648,13 @@ button.shot {
   text-decoration: underline;
 }
 .res-ref-popup {
-  position: absolute;
-  left: 0;
-  top: 1.5em;
-  z-index: 60;
+  /* fixed にすることで祖先の overflow クリップと重なり順の影響を受けない。
+     座標は ResRef 側で計測し、画面外に出る場合は上方向に反転させる。 */
+  position: fixed;
+  z-index: 210;
+  /* 座標が確定するまでは描画しない（誤った位置での一瞬のちらつき防止） */
+  visibility: hidden;
+  pointer-events: none;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -2597,6 +2667,10 @@ button.shot {
   box-shadow: var(--shadow);
   white-space: pre-wrap;
   font-weight: 400;
+}
+.res-ref-popup.positioned {
+  visibility: visible;
+  pointer-events: auto;
 }
 .res-ref-popup-item {
   display: flex;
