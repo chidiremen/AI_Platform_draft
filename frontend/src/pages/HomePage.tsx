@@ -4,7 +4,6 @@ import AspiceModal from '../components/AspiceModal'
 import ToolCard from '../components/ToolCard'
 import ToolTable, { TOGGLEABLE_COLUMNS, type ColumnKey } from '../components/ToolTable'
 import ColumnToggle from '../components/ColumnToggle'
-import NewsBanner from '../components/NewsBanner'
 import { TOOL_TYPES } from '../data/toolTypes'
 import { ASPICE_MAP, CATEGORY_COLORS } from '../data/aspice'
 import { WORK_CATEGORIES, type WorkCategoryId } from '../data/workCategories'
@@ -122,10 +121,6 @@ export default function HomePage() {
 
   return (
     <div className="container section">
-      {/* AI_WeeklyNews から取り込んだニュース。サイズ切替・畳みは
-          ユーザーごとに localStorage へ保存される。0件なら何も出さない。 */}
-      <NewsBanner />
-
       <div className="home-head">
         <div>
           <h1 className="page-title">AIツール カタログ</h1>

@@ -61,7 +61,6 @@ INSTALLED_APPS = [
     "metrics",
     "docs",
     "forum",
-    "news",
 ]
 
 MIDDLEWARE = [

@@ -1,7 +1,3 @@
 # プロジェクト共通の環境変数ファイル（ローカル用）
 .env
 .env.local
-
-# ニュース取り込み用の受け皿（実データはコミットしない）
-backend/data/incoming/*
-!backend/data/incoming/README.md

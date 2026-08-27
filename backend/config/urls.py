@@ -36,7 +36,6 @@ urlpatterns = [
     path("api/", include("tools.urls")),
     path("api/", include("metrics.urls")),
     path("api/", include("docs.urls")),
-    path("api/", include("news.urls")),
     path("api/", include("forum.urls")),
 ]
 

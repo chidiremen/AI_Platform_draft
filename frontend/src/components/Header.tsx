@@ -57,9 +57,6 @@ export default function Header() {
           */}
           {/* nav-label は狭い画面で非表示になり、絵文字アイコンだけが残る
               （ヘッダーを常に1行に保つため）。title は畳んだ時のツールチップ用。 */}
-          <Link className="btn btn-ghost" to="/news" title="AIニュース">
-            📰<span className="nav-label">ニュース</span>
-          </Link>
           <Link className="btn btn-ghost" to="/qa" title="このページのQ&A">
             💬<span className="nav-label">このページのQ&A</span>
           </Link>
