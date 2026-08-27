@@ -13,6 +13,8 @@ import type {
   ForumPost,
   ForumThread,
   GuideArticle,
+  NewsArticle,
+  NewsMeta,
   Question,
   Tool,
   ToolComment,
@@ -1253,4 +1255,102 @@ export async function getFeedbackRecipients(): Promise<{
   source: 'setting' | 'admins'
 }> {
   return apiFetch('/feedback-recipients/')
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// ニュース（AI_WeeklyNews 連携）
+// ─────────────────────────────────────────────────────────────────────
+
+interface NewsArticleDTO {
+  id: string
+  link: string
+  title: string
+  title_ja: string
+  display_title: string
+  summary: string
+  source: string
+  category: string
+  published: string | null
+  collected_at: string | null
+  thumbnail_url: string
+  is_visible: boolean
+  discussion_thread_id: string | null
+  discussion_post_count: number
+  imported_at: string
+}
+
+function mapNews(d: NewsArticleDTO): NewsArticle {
+  return {
+    id: d.id,
+    link: d.link,
+    title: d.title,
+    titleJa: d.title_ja,
+    displayTitle: d.display_title || d.title_ja || d.title,
+    summary: d.summary,
+    source: d.source,
+    category: d.category,
+    published: d.published,
+    collectedAt: d.collected_at,
+    thumbnailUrl: d.thumbnail_url,
+    isVisible: d.is_visible,
+    discussionThreadId: d.discussion_thread_id,
+    discussionPostCount: d.discussion_post_count ?? 0,
+    importedAt: d.imported_at,
+  }
+}
+
+export interface NewsQuery {
+  q?: string
+  category?: string
+  source?: string
+  days?: number
+  limit?: number
+}
+
+function newsQueryString(params?: NewsQuery): string {
+  const qs = new URLSearchParams()
+  if (params?.q) qs.set('q', params.q)
+  if (params?.category) qs.set('category', params.category)
+  if (params?.source) qs.set('source', params.source)
+  if (params?.days != null) qs.set('days', String(params.days))
+  if (params?.limit != null) qs.set('limit', String(params.limit))
+  return qs.toString() ? `?${qs}` : ''
+}
+
+export async function listNews(params?: NewsQuery): Promise<NewsArticle[]> {
+  const r = await apiFetch<Paginated<NewsArticleDTO> | NewsArticleDTO[]>(
+    `/news/${newsQueryString(params)}`,
+  )
+  const rows = Array.isArray(r) ? r : r.results
+  return rows.map(mapNews)
+}
+
+export async function getNews(id: string): Promise<NewsArticle> {
+  return mapNews(await apiFetch<NewsArticleDTO>(`/news/${id}/`))
+}
+
+export async function getNewsMeta(): Promise<NewsMeta> {
+  return apiFetch<NewsMeta>('/news/meta/')
+}
+
+/**
+ * このニュースの議論スレッドを取得（無ければ作成）。
+ * 記事1件につきスレッド1本なので、2人目以降は既存スレへ合流する。
+ */
+export async function discussNews(
+  id: string,
+): Promise<{ threadId: string; created: boolean }> {
+  const r = await apiFetch<{ thread_id: string; created: boolean }>(
+    `/news/${id}/discuss/`,
+    { method: 'POST' },
+  )
+  return { threadId: r.thread_id, created: r.created }
+}
+
+export async function toggleNewsVisible(id: string): Promise<NewsArticle> {
+  return mapNews(
+    await apiFetch<NewsArticleDTO>(`/news/${id}/toggle-visible/`, {
+      method: 'POST',
+    }),
+  )
 }

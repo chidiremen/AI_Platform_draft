@@ -192,3 +192,38 @@ export interface ForumThread {
   createdAt: string
   updatedAt: string
 }
+
+// ── ニュース（AI_WeeklyNews からの取り込み） ──
+
+export interface NewsArticle {
+  id: string
+  /** 元記事URL（AI_WeeklyNews 側でも主キー相当） */
+  link: string
+  /** 原題（多くは英語） */
+  title: string
+  /** 日本語タイトル。LLM 無し運用では空になりうる */
+  titleJa: string
+  /** 表示用タイトル（日本語があればそちら） */
+  displayTitle: string
+  summary: string
+  source: string
+  category: string
+  /** 記事の公開日時（取れないことがある） */
+  published: string | null
+  /** AI_WeeklyNews が収集した日時 */
+  collectedAt: string | null
+  thumbnailUrl: string
+  isVisible: boolean
+  /** 議論スレッドの ID。未作成なら null */
+  discussionThreadId: string | null
+  /** そのスレッドのレス数（スレ本文含む） */
+  discussionPostCount: number
+  importedAt: string
+}
+
+/** ニュースのフィルタ用ファセット */
+export interface NewsMeta {
+  count: number
+  categories: string[]
+  sources: string[]
+}
