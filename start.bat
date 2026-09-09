@@ -26,7 +26,11 @@ set "FAILED="
 
 call :log "======== start.bat %DATE% %TIME% ========"
 call "%ROOT%scripts\load_env.bat"
-call :log "ports: frontend=%FRONTEND_PORT% backend=%BACKEND_PORT%"
+call :log "ports: frontend=%FRONTEND_PORT% backend=%BACKEND_PORT% source=%ENV_PORT_SRC%"
+rem A .env that exists but yields no ports usually means it was saved as
+rem UTF-16 ("Unicode" in Notepad), which cmd cannot read. Warn loudly -
+rem silently starting on the default ports is the confusing failure mode.
+if /i "%ENV_PORT_SRC%"=="partial" call :log "[WARN] .env exists but the ports were not read from it - using defaults. Save .env as UTF-8, not UTF-16/Unicode."
 
 rem ---- python -------------------------------------------------------
 set "PY=%ROOT%backend\.venv\Scripts\python.exe"

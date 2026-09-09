@@ -4,6 +4,8 @@ Regression focus: creating a tool returned 403 in real-API mode. With token
 authentication (and Token listed before Session auth), a token-bearing request
 must create a tool successfully even when CSRF checks are enforced.
 """
+import shutil
+import tempfile
 from io import BytesIO
 from unittest import mock
 
@@ -19,6 +21,28 @@ from tools.models import AccessRequest, AspiceProcess, Like, Tool
 from tools import notifications
 
 User = get_user_model()
+
+
+class TempMediaRootMixin:
+    """テスト中だけ MEDIA_ROOT を一時ディレクトリに逃がす。
+
+    これが無いと、アップロード系のテストが開発用の backend/media/ に
+    実ファイルを書き込み続ける（大きいファイルの回帰テストは 1 回の実行で
+    数MB書くため、放っておくと際限なく肥大化する）。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._media_tmp = tempfile.mkdtemp(prefix="aitc-test-media-")
+        cls._media_override = override_settings(MEDIA_ROOT=cls._media_tmp)
+        cls._media_override.enable()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._media_override.disable()
+        shutil.rmtree(cls._media_tmp, ignore_errors=True)
+        super().tearDownClass()
 
 TOOL_PAYLOAD = {
     "title": "新ツール",
@@ -167,7 +191,7 @@ class AccessRequestNotificationTests(APITestCase):
         self.assertIn("申請者", body)
 
 
-class MultipartAndFileTests(APITestCase):
+class MultipartAndFileTests(TempMediaRootMixin, APITestCase):
     """multipart でのツール登録、スクリーンショット追加、ZIPダウンロードのE2E。"""
 
     def setUp(self):
@@ -619,7 +643,7 @@ class SeedToolsCommandTests(APITestCase):
         )
 
 
-class LargeUploadRegressionTests(APITestCase):
+class LargeUploadRegressionTests(TempMediaRootMixin, APITestCase):
     """回帰: 大きいファイルを含む multipart 登録が 500 になるバグ。
 
     Django は FILE_UPLOAD_MAX_MEMORY_SIZE(既定 2.5MB) を超えるアップロードを

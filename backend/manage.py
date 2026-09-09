@@ -7,14 +7,19 @@ from pathlib import Path
 
 
 def _load_env():
-    """プロジェクトルート `.env` → backend/.env の順に読み込む（後者が優先）。"""
+    """プロジェクトルート `.env` → backend/.env の順に読み込む（先に読んだ側が優先）。
+
+    文字コードは config.envfile 側で吸収する。以前はここで load_dotenv() を
+    直接呼んでいたため、`.env` が Shift-JIS 保存されていると
+    UnicodeDecodeError で manage.py 自体が起動しなくなっていた。
+    """
+    here = Path(__file__).resolve().parent
+    sys.path.insert(0, str(here))
     try:
-        from dotenv import load_dotenv
-    except Exception:  # dotenv 未インストールなら黙って諦める
+        from config.envfile import load_env_files
+    except Exception:  # 依存が無くても manage.py は動くべき
         return
-    root = Path(__file__).resolve().parent.parent  # /home/user/AI_Platform_draft
-    load_dotenv(root / ".env")
-    load_dotenv(Path(__file__).resolve().parent / ".env")
+    load_env_files(here.parent / ".env", here / ".env")
 
 
 def main():

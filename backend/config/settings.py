@@ -11,14 +11,11 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Optional .env support (python-dotenv). プロジェクトルート `.env` を最初に、
-# backend/.env をその後に読み込む（後者が優先）。
-try:
-    from dotenv import load_dotenv
+# backend/.env をその後に読み込む（先に読んだ側が優先）。
+# 文字コードの揺れ（Windows の ANSI=cp932 保存など）は envfile 側で吸収する。
+from config.envfile import load_env_files  # noqa: E402
 
-    load_dotenv(BASE_DIR.parent / ".env")
-    load_dotenv(BASE_DIR / ".env")
-except Exception:  # pragma: no cover - dotenv is optional
-    pass
+load_env_files(BASE_DIR.parent / ".env", BASE_DIR / ".env")
 
 # --------------------------------------------------------------------------- #
 # Core / security

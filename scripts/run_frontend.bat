@@ -3,6 +3,7 @@ rem ---------------------------------------------------------------
 rem  Vite dev server. Started by start.bat in its own window.
 rem  The port comes from the root .env via vite.config.ts, so it is
 rem  not passed on the command line here.
+rem  Node always writes UTF-8, so frontend.log needs no special care.
 rem ---------------------------------------------------------------
 setlocal EnableExtensions
 set "ROOT=%~dp0..\"
