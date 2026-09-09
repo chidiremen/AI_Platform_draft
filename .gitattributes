@@ -1,0 +1,4 @@
+# Windows のバッチファイルは必ず CRLF で取り出す。
+# LF のままだと cmd.exe がラベル/ブロックの解釈に失敗することがある。
+*.bat text eol=crlf
+*.cmd text eol=crlf

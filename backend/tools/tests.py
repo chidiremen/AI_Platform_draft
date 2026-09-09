@@ -7,6 +7,7 @@ must create a tool successfully even when CSRF checks are enforced.
 from io import BytesIO
 from unittest import mock
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
@@ -616,3 +617,79 @@ class SeedToolsCommandTests(APITestCase):
         self.assertNotEqual(
             Tool.objects.get(title="Teams会議リアルタイム要約Bot").summary, "改変"
         )
+
+
+class LargeUploadRegressionTests(APITestCase):
+    """回帰: 大きいファイルを含む multipart 登録が 500 になるバグ。
+
+    Django は FILE_UPLOAD_MAX_MEMORY_SIZE(既定 2.5MB) を超えるアップロードを
+    ディスク上の TemporaryUploadedFile として扱う。この中身は
+    _io.BufferedRandom で、deepcopy / pickle ができない。
+    ToolWriteSerializer.to_internal_value が QueryDict.copy()（内部で
+    deepcopy を行う）を使っていたため、
+    ``TypeError: cannot pickle 'BufferedRandom' instances`` で 500 になっていた。
+    """
+
+    def setUp(self):
+        self.author = User.objects.create_user(
+            username="bigup", password="pw", role="member"
+        )
+        token, _ = Token.objects.get_or_create(user=self.author)
+        self.client = APIClient()
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+
+    def _big_zip(self, name="big.zip"):
+        # 既定の閾値 2.5MB を確実に超えるサイズにして
+        # TemporaryUploadedFile 経路を通す
+        size = settings.FILE_UPLOAD_MAX_MEMORY_SIZE + 1024
+        return SimpleUploadedFile(
+            name, b"PK\x03\x04" + b"0" * size, content_type="application/zip"
+        )
+
+    def test_create_with_large_zip_does_not_500(self):
+        res = self.client.post(
+            "/api/tools/",
+            {
+                "title": "大きいzip",
+                "summary": "概要",
+                "readme": "## R",
+                "tool_type": "zip_upload",
+                "work_categories": "meeting,document",
+                "aspice_process_ids": "SWE.1,SWE.2",
+                "zip_file": self._big_zip(),
+            },
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        self.assertEqual(res.data["work_categories"], ["meeting", "document"])
+        self.assertIn("big", res.data["zip_file_name"])
+
+    def test_update_with_large_zip_does_not_500(self):
+        tool = Tool.objects.create(
+            title="t", summary="s", tool_type="zip_upload", author=self.author
+        )
+        res = self.client.patch(
+            f"/api/tools/{tool.id}/",
+            {
+                "work_categories": "meeting",
+                "zip_file": self._big_zip("big2.zip"),
+            },
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        self.assertEqual(res.data["work_categories"], ["meeting"])
+
+    def test_large_screenshot_upload_does_not_500(self):
+        tool = Tool.objects.create(
+            title="t", summary="s", tool_type="other", author=self.author
+        )
+        size = settings.FILE_UPLOAD_MAX_MEMORY_SIZE + 1024
+        image = SimpleUploadedFile(
+            "big.png", b"\x89PNG\r\n\x1a\n" + b"0" * size, content_type="image/png"
+        )
+        res = self.client.post(
+            f"/api/tools/{tool.id}/screenshots/",
+            {"image": image},
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)

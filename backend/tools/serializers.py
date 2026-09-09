@@ -1,3 +1,4 @@
+from django.http import QueryDict
 from rest_framework import serializers
 
 from accounts.serializers import UserSerializer
@@ -36,6 +37,39 @@ def _coerce_string_list(value):
         except Exception:
             pass
     return [p.strip() for p in text.split(",") if p.strip()]
+
+
+def _shallow_copy_data(data):
+    """QueryDict / dict を「ファイルを deepcopy せずに」複製する。
+
+    QueryDict.copy() は内部で copy.deepcopy() を使う。2.5MB
+    (FILE_UPLOAD_MAX_MEMORY_SIZE) を超えるアップロードは
+    ディスク上の TemporaryUploadedFile になり、その中身は
+    _io.BufferedRandom なので deepcopy / pickle できない。結果として
+    ``TypeError: cannot pickle '_io.BufferedRandom' object`` で 500 になる。
+    ここではファイルオブジェクトは参照のまま浅くコピーする。
+
+    dict ではなく QueryDict のまま返すのが重要。DRF は getlist の有無で
+    HTMLフォーム入力かを判定しており (rest_framework.fields.html.is_html_input)、
+    素の dict にすると multipart 時の未送信フィールドの扱いが変わってしまう。
+    """
+    if not hasattr(data, "getlist"):
+        return dict(data)
+    copied = QueryDict(mutable=True)
+    copied.encoding = getattr(data, "encoding", None) or copied.encoding
+    for key in data:
+        copied.setlist(key, data.getlist(key))
+    return copied
+
+
+def _raw_value(data, key):
+    """multipart で同名フィールドが複数回送られても取りこぼさない取り出し。"""
+    if hasattr(data, "getlist"):
+        values = data.getlist(key)
+        if len(values) > 1:
+            return values
+        return values[0] if values else None
+    return data.get(key)
 
 
 class AspiceProcessSerializer(serializers.ModelSerializer):
@@ -180,21 +214,23 @@ class ToolWriteSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id"]
 
+    #: multipart で「配列風」に送られてくる（正規化が必要な）フィールド
+    LIST_LIKE_FIELDS = ("aspice_process_ids", "work_categories")
+
     def to_internal_value(self, data):
         # multipart で送られる配列風フィールドを正規化してから検証する。
         # （ListField/JSONField は multipart と相性が悪いため CharField で受ける）
-        if hasattr(data, "_mutable"):
-            data._mutable = True  # QueryDict
-        if "aspice_process_ids" in data:
-            data = data.copy() if hasattr(data, "copy") else dict(data)
-            data["aspice_process_ids"] = ",".join(
-                _coerce_string_list(data.get("aspice_process_ids"))
-            )
-        if "work_categories" in data:
-            data = data.copy() if hasattr(data, "copy") else dict(data)
-            data["work_categories"] = ",".join(
-                _coerce_string_list(data.get("work_categories"))
-            )
+        #
+        # 注意: ここで元の request.data を書き換えない。QueryDict.copy() も
+        # 使わない（アップロードファイルの deepcopy に失敗して 500 になる。
+        # _shallow_copy_data のドキュメント参照）。
+        targets = [f for f in self.LIST_LIKE_FIELDS if f in data]
+        if targets:
+            data = _shallow_copy_data(data)
+            for field in targets:
+                data[field] = ",".join(
+                    _coerce_string_list(_raw_value(data, field))
+                )
         return super().to_internal_value(data)
 
     def validate_aspice_process_ids(self, value):

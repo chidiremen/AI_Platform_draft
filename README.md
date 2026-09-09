@@ -66,6 +66,24 @@ npm run dev
 
 ## セットアップ
 
+### Windows（タスクスケジューラで自動起動したい場合）
+
+バッチ一式を用意してあります。詳しい手順は
+[`docs/windows-task-scheduler.md`](docs/windows-task-scheduler.md) を参照。
+
+```bat
+setup.bat        :: 初回のみ（.env / venv / 依存 / migrate をまとめて実行）
+start.bat        :: バック(Django)とフロント(Vite)をまとめて起動
+start.bat open   :: 起動してブラウザも開く
+stop.bat         :: 停止
+```
+
+- ポートはルートの `.env`（`FRONTEND_PORT` / `BACKEND_PORT`）から自動で読まれます
+- ログは `logs\start.log` / `logs\backend.log` / `logs\frontend.log`
+- 起動済みのポートは検出してスキップするため、二重起動しません
+
+### 手動で起動する場合
+
 ```bash
 cd frontend
 npm install
