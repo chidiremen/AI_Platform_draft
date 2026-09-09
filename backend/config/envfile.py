@@ -22,12 +22,12 @@ from pathlib import Path
 #: utf-16 はメモ帳の「Unicode」保存。cp932 は日本語 Windows の「ANSI」。
 #: latin-1 はどんなバイト列でも失敗しない最後の砦で、日本語コメントは
 #: 文字化けするが `KEY=VALUE` 行（ASCII）は正しく読めるため実害が小さい。
-_ENCODINGS = ("utf-8-sig", "utf-16", "cp932", "latin-1")
+ENCODINGS = ("utf-8-sig", "utf-16", "cp932", "latin-1")
 
 
 def decode_env_bytes(raw: bytes) -> str | None:
     """`.env` のバイト列をデコードする。どれでも読めなければ None。"""
-    for enc in _ENCODINGS:
+    for enc in ENCODINGS:
         try:
             return raw.decode(enc)
         except (UnicodeDecodeError, UnicodeError, LookupError):

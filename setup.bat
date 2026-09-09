@@ -15,7 +15,14 @@ if exist "%ROOT%.env" goto :env_ok
 copy "%ROOT%.env.example" "%ROOT%.env" >nul
 if errorlevel 1 goto :fail
 echo     created .env from .env.example
-echo     NOTE: set VITE_USE_MOCK=false in .env to talk to the real backend.
+echo.
+echo     IMPORTANT - check .env before starting:
+echo       VITE_USE_MOCK=false  talks to Django (real data). This is the default.
+echo       VITE_USE_MOCK=true   demo mode: logins use built-in demo users and the
+echo                            database is never touched. If you copied a
+echo                            db.sqlite3 here, keep this false.
+echo       FRONTEND_PORT / BACKEND_PORT must not clash with another instance.
+echo.
 goto :env_done
 :env_ok
 echo     .env already exists - keeping it

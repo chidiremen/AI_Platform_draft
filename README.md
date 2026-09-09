@@ -76,6 +76,7 @@ setup.bat        :: 初回のみ（.env / venv / 依存 / migrate をまとめ�
 start.bat        :: バック(Django)とフロント(Vite)をまとめて起動
 start.bat open   :: 起動してブラウザも開く
 stop.bat         :: 停止
+doctor.bat       :: セットアップ診断（ログインできない等の切り分け）
 ```
 
 - ポートはルートの `.env`（`FRONTEND_PORT` / `BACKEND_PORT`）から自動で読まれます

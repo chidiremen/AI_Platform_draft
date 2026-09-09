@@ -31,6 +31,12 @@ rem A .env that exists but yields no ports usually means it was saved as
 rem UTF-16 ("Unicode" in Notepad), which cmd cannot read. Warn loudly -
 rem silently starting on the default ports is the confusing failure mode.
 if /i "%ENV_PORT_SRC%"=="partial" call :log "[WARN] .env exists but the ports were not read from it - using defaults. Save .env as UTF-8, not UTF-16/Unicode."
+rem Mock mode makes the frontend authenticate against hard-coded demo users
+rem and never touch Django, so a copied db.sqlite3 looks "empty" and real
+rem logins fail. Surface it on every start - it is the classic head-scratcher
+rem after setting up a second folder.
+call :log "mock mode: VITE_USE_MOCK=%VITE_USE_MOCK%"
+if /i not "%VITE_USE_MOCK%"=="false" call :log "[WARN] running in MOCK mode - logins use built-in demo users, not the database. Set VITE_USE_MOCK=false in .env for real data."
 
 rem ---- python -------------------------------------------------------
 set "PY=%ROOT%backend\.venv\Scripts\python.exe"

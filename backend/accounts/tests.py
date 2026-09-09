@@ -4,7 +4,13 @@ Covers two bugs found in real-API mode:
   1. A Django superuser (``createsuperuser``) was shown as "member".
   2. (auth path) token-bearing requests must work for unsafe methods.
 """
+import os
+from io import StringIO
+from unittest import mock
+
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from django.test import TestCase
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient, APITestCase
@@ -206,3 +212,49 @@ class MeUpdateAndPasswordTests(APITestCase):
         self.assertTrue(self.user.check_password("newpw"))
         # 旧トークンは無効化されている
         self.assertFalse(Token.objects.filter(key=old_token.key).exists())
+
+
+class DoctorCommandTests(TestCase):
+    """`manage.py doctor` のスモークテスト。
+
+    A/B の2フォルダ構成でDBをコピーしてきたときの切り分けに使うコマンドなので、
+    「壊れた環境でも例外を出さずに報告して終わる」ことが最低条件。
+    """
+
+    def _run(self, **env):
+        out = StringIO()
+        with mock.patch.dict(os.environ, env):
+            call_command("doctor", stdout=out, stderr=out)
+        return out.getvalue()
+
+    def test_runs_and_reports_sections(self):
+        User.objects.create_user(username="d1", password="pw", role="member")
+        text = self._run(VITE_USE_MOCK="false")
+        for section in ("[.env]", "[データベース]", "[ユーザー]", "[メディア]", "[判定]"):
+            self.assertIn(section, text)
+        self.assertIn("d1", text)
+
+    def test_flags_mock_mode(self):
+        """モックモードだとDBのユーザーでログインできない、を検知する。"""
+        text = self._run(VITE_USE_MOCK="true")
+        self.assertIn("モックモード", text)
+        self.assertIn("要確認", text)
+
+    def test_unset_mock_flag_is_treated_as_mock(self):
+        """未設定時、フロントは既定でモックになるので警告対象。"""
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("VITE_USE_MOCK", None)
+            out = StringIO()
+            call_command("doctor", stdout=out, stderr=out)
+        self.assertIn("モックモード", out.getvalue())
+
+    def test_flags_empty_user_table(self):
+        """ユーザー0件（DBのコピー先違い / 空DB生成）を検知する。"""
+        User.objects.all().delete()
+        text = self._run(VITE_USE_MOCK="false")
+        self.assertIn("ユーザーが0件", text)
+
+    def test_does_not_raise_when_media_missing(self):
+        with self.settings(MEDIA_ROOT="/存在しないパス/media"):
+            text = self._run(VITE_USE_MOCK="false")
+        self.assertIn("[判定]", text)

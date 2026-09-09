@@ -1,7 +1,7 @@
 @echo off
 rem ---------------------------------------------------------------
-rem  Read FRONTEND_PORT / BACKEND_PORT from the project root .env
-rem  and export them to the CALLING script (no setlocal on purpose).
+rem  Read the settings start.bat needs from the project root .env and
+rem  export them to the CALLING script (no setlocal on purpose).
 rem  Falls back to the defaults when .env is missing or unreadable.
 rem
 rem  Only simple "KEY=VALUE" lines are parsed; "#" starts a comment.
@@ -12,7 +12,7 @@ rem  A UTF-16 .env ("Unicode" in Notepad) is NOT readable by cmd; that
 rem  is what ENV_PORT_SRC below is for, so the caller can warn instead
 rem  of silently starting on the wrong ports.
 rem
-rem  Sets: FRONTEND_PORT, BACKEND_PORT, ENV_PORT_SRC
+rem  Sets: FRONTEND_PORT, BACKEND_PORT, VITE_USE_MOCK, ENV_PORT_SRC
 rem    ENV_PORT_SRC = "env"     both ports came from .env
 rem                   "none"    no .env file - defaults used
 rem                   "partial" .env exists but the ports were not
@@ -21,6 +21,7 @@ rem ---------------------------------------------------------------
 set "_ENV_ROOT=%~dp0..\"
 set "FRONTEND_PORT="
 set "BACKEND_PORT="
+set "VITE_USE_MOCK="
 set "_ENV_HITS=0"
 set "ENV_PORT_SRC=none"
 
@@ -34,6 +35,9 @@ if "%_ENV_HITS%"=="2" set "ENV_PORT_SRC=env"
 :_defaults
 if not defined FRONTEND_PORT set "FRONTEND_PORT=5174"
 if not defined BACKEND_PORT  set "BACKEND_PORT=8009"
+rem The frontend itself defaults to mock mode when the flag is absent,
+rem so an unset value must be reported as "true", not as "unknown".
+if not defined VITE_USE_MOCK set "VITE_USE_MOCK=true"
 set "_ENV_ROOT="
 set "_ENV_HITS="
 goto :eof
@@ -48,6 +52,7 @@ set "_V=%_V: =%"
 
 if /i "%_K%"=="FRONTEND_PORT" goto :_hit_front
 if /i "%_K%"=="BACKEND_PORT"  goto :_hit_back
+if /i "%_K%"=="VITE_USE_MOCK" goto :_hit_mock
 
 rem BOM tolerance. Notepad's "UTF-8 with BOM" glues 3 bytes onto the very
 rem first line, so a .env that opens directly with a key arrives here as
@@ -58,6 +63,8 @@ set "_R=%_K:FRONTEND_PORT=%"
 if not "%_R%"=="%_K%" if not "%_R%"=="" if "%_R:~3%"=="" goto :_hit_front
 set "_R=%_K:BACKEND_PORT=%"
 if not "%_R%"=="%_K%" if not "%_R%"=="" if "%_R:~3%"=="" goto :_hit_back
+set "_R=%_K:VITE_USE_MOCK=%"
+if not "%_R%"=="%_K%" if not "%_R%"=="" if "%_R:~3%"=="" goto :_hit_mock
 goto :_set_kv_done
 
 :_hit_front
@@ -68,6 +75,10 @@ goto :_set_kv_done
 :_hit_back
 set "BACKEND_PORT=%_V%"
 set /a _ENV_HITS+=1
+goto :_set_kv_done
+
+:_hit_mock
+set "VITE_USE_MOCK=%_V%"
 
 :_set_kv_done
 set "_K="
