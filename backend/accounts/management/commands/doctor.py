@@ -52,8 +52,10 @@ class Command(BaseCommand):
         candidates = [root / ".env", Path(settings.BASE_DIR) / ".env"]
         found = [p for p in candidates if p.is_file()]
         if not found:
+            # ここで return してはいけない。.env が無いときこそ
+            # VITE_USE_MOCK が既定(=モック)のまま起動している可能性が高く、
+            # 下のモード判定が一番効く場面だから。
             self._row("場所", "見つかりません", "ルートに .env を置いてください")
-            return
         for path in found:
             enc = self._detect_encoding(path)
             note = None

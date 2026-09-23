@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "metrics",
     "docs",
     "forum",
+    "themes",
 ]
 
 MIDDLEWARE = [
@@ -105,6 +106,10 @@ DATABASES = {
 # Authentication
 # --------------------------------------------------------------------------- #
 AUTH_USER_MODEL = "accounts.User"
+
+# テーマがこの日数だけ進捗更新されないと一覧で「停滞」と表示する。
+# データは書き換えず表示上の判定だけなので、変更しても既存データに影響しない。
+THEME_STALLED_AFTER_DAYS = int(os.environ.get("THEME_STALLED_AFTER_DAYS", "30"))
 
 AUTH_PASSWORD_VALIDATORS = [
     {

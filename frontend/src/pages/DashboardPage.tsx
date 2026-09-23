@@ -18,6 +18,8 @@ import {
   YAxis,
 } from 'recharts'
 import { useApp } from '../store'
+import { useThemeStore } from '../hooks/useThemes'
+import type { ThemeSummary } from '../types'
 import * as api from '../api'
 import { ASPICE_PROCESSES, CATEGORY_COLORS } from '../data/aspice'
 import { TOOL_TYPES, TOOL_TYPE_MAP } from '../data/toolTypes'
@@ -35,6 +37,73 @@ const tooltipStyle = {
   borderRadius: 8,
   color: '#e8eef7',
   fontSize: 13,
+}
+
+/**
+ * テーマ（進行中の取り組み）の状況パネル。
+ *
+ * 成果物になった分だけを見ていると「いま何が動いているか」が分からない。
+ * 着手中・停滞・凍結を並べて、途中の取り組みと止まった取り組みも
+ * 部門として把握できるようにする。
+ */
+function ThemeStatusPanel() {
+  const store = useThemeStore()
+  const [summary, setSummary] = useState<ThemeSummary | null>(null)
+  const loadSummary = store.loadSummary
+
+  useEffect(() => {
+    void loadSummary().then(setSummary).catch(() => setSummary(null))
+  }, [loadSummary])
+
+  if (!summary) return null
+  const s = summary
+  const live = s.byStatus.active + s.byStatus.recruiting
+
+  return (
+    <div className="dash-card col-12">
+      <h3>🚀 進行中のテーマ</h3>
+      <div className="kpi-grid" style={{ marginBottom: 16 }}>
+        <div className="kpi">
+          <div className="kpi-num">{live}</div>
+          <div className="kpi-lbl">動いているテーマ</div>
+          <div className="kpi-sub">着手中 {s.byStatus.active} / 募集中 {s.byStatus.recruiting}</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-num">{s.stalled}</div>
+          <div className="kpi-lbl">停滞（要フォロー）</div>
+          <div className="kpi-sub">{s.stalledAfterDays}日以上 進捗なし</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-num">{s.byStatus.frozen}</div>
+          <div className="kpi-lbl">凍結（知見として蓄積）</div>
+          <div className="kpi-sub">理由つきで記録済み</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi-num">{s.ideaOpen}</div>
+          <div className="kpi-lbl">未着手のアイデア</div>
+          <div className="kpi-sub">実装者を待っている</div>
+        </div>
+      </div>
+
+      {s.frozenReasons.length > 0 && (
+        <>
+          <h4 className="filter-group-label">🧊 凍結したテーマと、その理由</h4>
+          <ul className="theme-frozen-digest">
+            {s.frozenReasons.slice(0, 5).map((r) => (
+              <li key={r.id}>
+                <Link to={`/themes/${r.id}`}>{r.title}</Link>
+                <span className="dim"> — {r.owner}</span>
+                <p>{r.reason}</p>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <Link className="btn btn-ghost btn-sm" to="/themes">
+        テーマ一覧へ →
+      </Link>
+    </div>
+  )
 }
 
 export default function DashboardPage() {
@@ -215,6 +284,8 @@ export default function DashboardPage() {
       </div>
 
       <div className="dash-grid">
+        <ThemeStatusPanel />
+
         {/* ファネル */}
         <div className="dash-card col-4">
           <h3>ファネル（インプレッション → 閲覧 → 申請）</h3>

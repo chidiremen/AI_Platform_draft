@@ -192,3 +192,161 @@ export interface ForumThread {
   createdAt: string
   updatedAt: string
 }
+
+// ── テーマ / アイデア（進行中の取り組みの管理） ──
+
+/** テーマの状態。「停滞」は保存値ではなく派生値なのでここには含めない。 */
+export type ThemeStatus =
+  | 'recruiting' // 仲間募集中
+  | 'active' // 着手中
+  | 'frozen' // 凍結（課題により中断）
+  | 'done' // 完了
+  | 'merged' // 別テーマへ統合済み
+
+export type ThemeEntryKind = 'progress' | 'comment' | 'system'
+
+export type ThemeMemberRole = 'owner' | 'member'
+
+export type JoinRequestStatus = 'pending' | 'approved' | 'rejected'
+
+export type IdeaStatus = 'open' | 'adopted' | 'declined'
+
+/** テーマのタイムライン1件（進捗・コメント・システム記録） */
+export interface ThemeEntry {
+  id: string
+  themeId: string
+  kind: ThemeEntryKind
+  body: string
+  /** 進捗率（0-100、任意） */
+  progressPercent?: number | null
+  /** 投稿時点のステータス。後から読んでも文脈が失われないように残す */
+  statusAtPost: string
+  /** システム記録の場合は null */
+  author: string | null
+  authorId: number | null
+  canEdit: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ThemeMember {
+  id: number
+  userId: number
+  name: string
+  role: ThemeMemberRole
+  joinedAt: string
+}
+
+export interface ThemeJoinRequest {
+  id: string
+  themeId: string
+  userId: number
+  userName: string
+  message: string
+  status: JoinRequestStatus
+  decidedBy: string | null
+  decidedAt: string | null
+  createdAt: string
+}
+
+export interface Theme {
+  id: string
+  title: string
+  summary: string
+  body: string
+  status: ThemeStatus
+  tags: string[]
+  workCategories: string[]
+  owner: string
+  ownerId: number
+
+  /** 凍結理由。再開しても消さない（なぜ一度止まったかは残す価値がある） */
+  freezeReason: string
+  frozenAt: string | null
+
+  /** 完了時の成果物（ツールカタログ） */
+  resultingTool: string | null
+  resultingToolTitle: string | null
+
+  /** 合流先（このテーマが吸収された場合） */
+  mergedInto: string | null
+  mergedIntoTitle: string | null
+  mergedAt: string | null
+
+  /** 昇格元のアイデア */
+  originIdea: string | null
+  originIdeaTitle: string | null
+
+  lastProgressAt: string | null
+  daysSinceProgress: number | null
+  /** 一定期間進捗が無い「着手中/仲間募集中」か。サーバ側の派生値 */
+  isStalled: boolean
+  /** 停滞と見なすまでの日数（サーバ設定） */
+  stalledAfterDays: number
+
+  memberCount: number
+  entryCount: number
+  latestProgress: string | null
+  latestProgressPercent: number | null
+
+  isMember: boolean
+  canEdit: boolean
+  myJoinRequestStatus: JoinRequestStatus | null
+  /** 承認待ちの件数（発起人にのみ意味がある） */
+  pendingJoinCount: number
+
+  /** 詳細取得時のみ入る */
+  members?: ThemeMember[]
+  entries?: ThemeEntry[]
+
+  viewCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface IdeaComment {
+  id: string
+  ideaId: string
+  author: string
+  body: string
+  canEdit: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Idea {
+  id: string
+  title: string
+  body: string
+  tags: string[]
+  workCategories: string[]
+  status: IdeaStatus
+  author: string
+  authorId: number
+  promotedTheme: string | null
+  promotedThemeTitle: string | null
+  voteCount: number
+  votedByMe: boolean
+  commentCount: number
+  /** 詳細取得時のみ入る */
+  comments?: IdeaComment[]
+  canEdit: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+/** 部門としての「いま何が動いているか」 */
+export interface ThemeSummary {
+  total: number
+  byStatus: Record<ThemeStatus, number>
+  stalled: number
+  stalledAfterDays: number
+  ideaOpen: number
+  frozenReasons: {
+    id: string
+    title: string
+    reason: string
+    owner: string
+    frozenAt: string | null
+  }[]
+}

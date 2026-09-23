@@ -11,8 +11,12 @@ import ProfilePage from './pages/ProfilePage'
 import GuidePage from './pages/GuidePage'
 import QAPage from './pages/QAPage'
 import ForumPage from './pages/ForumPage'
+import ThemesPage from './pages/ThemesPage'
+import ThemeFormPage from './pages/ThemeFormPage'
+import IdeasPage from './pages/IdeasPage'
 import { DocsProvider } from './hooks/useDocs'
 import { ForumProvider } from './hooks/useForum'
+import { ThemeProvider } from './hooks/useThemes'
 import { AppProvider, useApp } from './store'
 
 function AuthedApp() {
@@ -40,6 +44,7 @@ function AuthedApp() {
   return (
     <DocsProvider>
       <ForumProvider>
+        <ThemeProvider>
         <div className="app-shell">
           <Header />
           <main>
@@ -60,10 +65,19 @@ function AuthedApp() {
               <Route path="/qa/:id/:action" element={<QAPage />} />
               <Route path="/forum" element={<ForumPage />} />
               <Route path="/forum/:id" element={<ForumPage />} />
+              <Route path="/themes" element={<ThemesPage />} />
+              {/* /themes/new は :id より前に置く。後ろだと "new" が id として
+                  マッチしてしまい、登録画面が開けなくなる。 */}
+              <Route path="/themes/new" element={<ThemeFormPage />} />
+              <Route path="/themes/:id" element={<ThemesPage />} />
+              <Route path="/themes/:id/edit" element={<ThemeFormPage />} />
+              <Route path="/ideas" element={<IdeasPage />} />
+              <Route path="/ideas/:id" element={<IdeasPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>
         </div>
+        </ThemeProvider>
       </ForumProvider>
     </DocsProvider>
   )

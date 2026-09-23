@@ -63,6 +63,9 @@ export default function Header() {
           <Link className="btn btn-ghost" to="/forum" title="アイデアフォーラム">
             🧵<span className="nav-label">フォーラム</span>
           </Link>
+          <Link className="btn btn-ghost" to="/themes" title="進行中のテーマ">
+            🚀<span className="nav-label">テーマ</span>
+          </Link>
           <Link className="btn btn-ghost" to="/mypage" title="マイページ">
             🙋<span className="nav-label">マイページ</span>
           </Link>

@@ -37,6 +37,7 @@ urlpatterns = [
     path("api/", include("metrics.urls")),
     path("api/", include("docs.urls")),
     path("api/", include("forum.urls")),
+    path("api/", include("themes.urls")),
 ]
 
 if settings.DEBUG:

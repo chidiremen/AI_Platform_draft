@@ -13,7 +13,19 @@ import type {
   ForumPost,
   ForumThread,
   GuideArticle,
+  Idea,
+  IdeaComment,
+  IdeaStatus,
+  JoinRequestStatus,
   Question,
+  Theme,
+  ThemeEntry,
+  ThemeEntryKind,
+  ThemeJoinRequest,
+  ThemeMember,
+  ThemeMemberRole,
+  ThemeStatus,
+  ThemeSummary,
   Tool,
   ToolComment,
   ToolType,
@@ -1253,4 +1265,537 @@ export async function getFeedbackRecipients(): Promise<{
   source: 'setting' | 'admins'
 }> {
   return apiFetch('/feedback-recipients/')
+}
+
+// ─────────────────────────────────────────────────────────────
+// テーマ / アイデア
+// ─────────────────────────────────────────────────────────────
+
+interface ThemeEntryDTO {
+  id: string
+  theme: string
+  kind: ThemeEntryKind
+  body: string
+  progress_percent: number | null
+  status_at_post: string
+  author: UserDTO | null
+  can_edit: boolean
+  created_at: string
+  updated_at: string
+}
+
+interface ThemeMemberDTO {
+  id: number
+  user: UserDTO
+  role: ThemeMemberRole
+  joined_at: string
+}
+
+interface ThemeJoinRequestDTO {
+  id: string
+  theme: string
+  user: UserDTO
+  message: string
+  status: JoinRequestStatus
+  decided_by: UserDTO | null
+  decided_at: string | null
+  created_at: string
+}
+
+interface ThemeDTO {
+  id: string
+  title: string
+  summary: string
+  body: string
+  status: ThemeStatus
+  tags: string[]
+  work_categories: string[]
+  owner: UserDTO
+  freeze_reason: string
+  frozen_at: string | null
+  resulting_tool: string | null
+  resulting_tool_title: string | null
+  merged_into: string | null
+  merged_into_title: string | null
+  merged_at: string | null
+  origin_idea: string | null
+  origin_idea_title: string | null
+  last_progress_at: string | null
+  days_since_progress: number | null
+  is_stalled: boolean
+  stalled_after_days: number
+  member_count: number
+  entry_count: number
+  latest_progress: string | null
+  latest_progress_percent: number | null
+  is_member: boolean
+  can_edit: boolean
+  my_join_request_status: JoinRequestStatus | null
+  pending_join_count: number
+  members: ThemeMemberDTO[] | null
+  entries: ThemeEntryDTO[] | null
+  view_count: number
+  created_at: string
+  updated_at: string
+}
+
+interface IdeaCommentDTO {
+  id: string
+  idea: string
+  author: UserDTO
+  body: string
+  can_edit: boolean
+  created_at: string
+  updated_at: string
+}
+
+interface IdeaDTO {
+  id: string
+  title: string
+  body: string
+  tags: string[]
+  work_categories: string[]
+  status: IdeaStatus
+  author: UserDTO
+  promoted_theme: string | null
+  promoted_theme_title: string | null
+  vote_count: number
+  voted_by_me: boolean
+  comment_count: number
+  comments: IdeaCommentDTO[] | null
+  can_edit: boolean
+  created_at: string
+  updated_at: string
+}
+
+function userLabel(u: UserDTO | null): string {
+  if (!u) return ''
+  return u.display_name || u.username
+}
+
+export function mapThemeEntry(d: ThemeEntryDTO): ThemeEntry {
+  return {
+    id: d.id,
+    themeId: d.theme,
+    kind: d.kind,
+    body: d.body,
+    progressPercent: d.progress_percent,
+    statusAtPost: d.status_at_post,
+    author: d.author ? userLabel(d.author) : null,
+    authorId: d.author ? d.author.id : null,
+    canEdit: !!d.can_edit,
+    createdAt: d.created_at,
+    updatedAt: d.updated_at,
+  }
+}
+
+function mapThemeMember(d: ThemeMemberDTO): ThemeMember {
+  return {
+    id: d.id,
+    userId: d.user.id,
+    name: userLabel(d.user),
+    role: d.role,
+    joinedAt: d.joined_at,
+  }
+}
+
+export function mapJoinRequest(d: ThemeJoinRequestDTO): ThemeJoinRequest {
+  return {
+    id: d.id,
+    themeId: d.theme,
+    userId: d.user.id,
+    userName: userLabel(d.user),
+    message: d.message,
+    status: d.status,
+    decidedBy: d.decided_by ? userLabel(d.decided_by) : null,
+    decidedAt: d.decided_at,
+    createdAt: d.created_at,
+  }
+}
+
+export function mapTheme(d: ThemeDTO): Theme {
+  return {
+    id: d.id,
+    title: d.title,
+    summary: d.summary,
+    body: d.body ?? '',
+    status: d.status,
+    tags: d.tags ?? [],
+    workCategories: d.work_categories ?? [],
+    owner: userLabel(d.owner),
+    ownerId: d.owner?.id ?? 0,
+    freezeReason: d.freeze_reason ?? '',
+    frozenAt: d.frozen_at,
+    resultingTool: d.resulting_tool,
+    resultingToolTitle: d.resulting_tool_title,
+    mergedInto: d.merged_into,
+    mergedIntoTitle: d.merged_into_title,
+    mergedAt: d.merged_at,
+    originIdea: d.origin_idea,
+    originIdeaTitle: d.origin_idea_title,
+    lastProgressAt: d.last_progress_at,
+    daysSinceProgress: d.days_since_progress,
+    isStalled: !!d.is_stalled,
+    stalledAfterDays: d.stalled_after_days,
+    memberCount: d.member_count,
+    entryCount: d.entry_count,
+    latestProgress: d.latest_progress,
+    latestProgressPercent: d.latest_progress_percent,
+    isMember: !!d.is_member,
+    canEdit: !!d.can_edit,
+    myJoinRequestStatus: d.my_join_request_status,
+    pendingJoinCount: d.pending_join_count ?? 0,
+    members: d.members ? d.members.map(mapThemeMember) : undefined,
+    entries: d.entries ? d.entries.map(mapThemeEntry) : undefined,
+    viewCount: d.view_count ?? 0,
+    createdAt: d.created_at,
+    updatedAt: d.updated_at,
+  }
+}
+
+export function mapIdeaComment(d: IdeaCommentDTO): IdeaComment {
+  return {
+    id: d.id,
+    ideaId: d.idea,
+    author: userLabel(d.author),
+    body: d.body,
+    canEdit: !!d.can_edit,
+    createdAt: d.created_at,
+    updatedAt: d.updated_at,
+  }
+}
+
+export function mapIdea(d: IdeaDTO): Idea {
+  return {
+    id: d.id,
+    title: d.title,
+    body: d.body ?? '',
+    tags: d.tags ?? [],
+    workCategories: d.work_categories ?? [],
+    status: d.status,
+    author: userLabel(d.author),
+    authorId: d.author?.id ?? 0,
+    promotedTheme: d.promoted_theme,
+    promotedThemeTitle: d.promoted_theme_title,
+    voteCount: d.vote_count ?? 0,
+    votedByMe: !!d.voted_by_me,
+    commentCount: d.comment_count ?? 0,
+    comments: d.comments ? d.comments.map(mapIdeaComment) : undefined,
+    canEdit: !!d.can_edit,
+    createdAt: d.created_at,
+    updatedAt: d.updated_at,
+  }
+}
+
+export interface ThemeListParams {
+  status?: string
+  q?: string
+  tag?: string
+  category?: string
+  mine?: boolean
+  stalled?: boolean
+}
+
+function themeQuery(params: ThemeListParams): string {
+  const qs = new URLSearchParams()
+  if (params.status) qs.set('status', params.status)
+  if (params.q) qs.set('q', params.q)
+  if (params.tag) qs.set('tag', params.tag)
+  if (params.category) qs.set('category', params.category)
+  if (params.mine) qs.set('mine', 'true')
+  if (params.stalled !== undefined) qs.set('stalled', String(params.stalled))
+  const s = qs.toString()
+  return s ? `?${s}` : ''
+}
+
+export async function listThemes(params: ThemeListParams = {}): Promise<Theme[]> {
+  const rows = await fetchAllPages<ThemeDTO>(`/themes/${themeQuery(params)}`)
+  return rows.map(mapTheme)
+}
+
+export async function getTheme(id: string): Promise<Theme> {
+  return mapTheme(await apiFetch<ThemeDTO>(`/themes/${id}/`))
+}
+
+export interface ThemeInput {
+  title: string
+  summary: string
+  body?: string
+  status?: ThemeStatus
+  tags?: string[]
+  workCategories?: string[]
+  resultingTool?: string | null
+}
+
+function themeBody(input: ThemeInput) {
+  const out: Record<string, unknown> = {
+    title: input.title,
+    summary: input.summary,
+    body: input.body ?? '',
+  }
+  if (input.status) out.status = input.status
+  if (input.tags) out.tags = input.tags
+  if (input.workCategories) out.work_categories = input.workCategories
+  if (input.resultingTool !== undefined) out.resulting_tool = input.resultingTool
+  return out
+}
+
+export async function createTheme(input: ThemeInput): Promise<Theme> {
+  return mapTheme(
+    await apiFetch<ThemeDTO>('/themes/', {
+      method: 'POST',
+      body: JSON.stringify(themeBody(input)),
+    }),
+  )
+}
+
+export async function updateTheme(id: string, input: Partial<ThemeInput>): Promise<Theme> {
+  return mapTheme(
+    await apiFetch<ThemeDTO>(`/themes/${id}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(themeBody(input as ThemeInput)),
+    }),
+  )
+}
+
+export async function deleteTheme(id: string): Promise<void> {
+  await apiFetch<void>(`/themes/${id}/`, { method: 'DELETE' })
+}
+
+/** 登録前の重複チェック。似たテーマを最大5件返す。 */
+export async function similarThemes(params: {
+  title?: string
+  tags?: string[]
+  categories?: string[]
+  exclude?: string
+}): Promise<Theme[]> {
+  const qs = new URLSearchParams()
+  if (params.title) qs.set('title', params.title)
+  if (params.tags?.length) qs.set('tags', params.tags.join(','))
+  if (params.categories?.length) qs.set('categories', params.categories.join(','))
+  if (params.exclude) qs.set('exclude', params.exclude)
+  const rows = await apiFetch<ThemeDTO[]>(`/themes/similar/?${qs.toString()}`)
+  return rows.map(mapTheme)
+}
+
+export async function listThemeEntries(themeId: string): Promise<ThemeEntry[]> {
+  const rows = await apiFetch<ThemeEntryDTO[]>(`/themes/${themeId}/entries/`)
+  return rows.map(mapThemeEntry)
+}
+
+export async function createThemeEntry(
+  themeId: string,
+  input: { kind: ThemeEntryKind; body: string; progressPercent?: number | null },
+): Promise<ThemeEntry> {
+  return mapThemeEntry(
+    await apiFetch<ThemeEntryDTO>(`/themes/${themeId}/entries/`, {
+      method: 'POST',
+      body: JSON.stringify({
+        kind: input.kind,
+        body: input.body,
+        progress_percent: input.progressPercent ?? null,
+      }),
+    }),
+  )
+}
+
+export async function updateThemeEntry(
+  entryId: string,
+  patch: { body?: string; progressPercent?: number | null },
+): Promise<ThemeEntry> {
+  const body: Record<string, unknown> = {}
+  if (patch.body !== undefined) body.body = patch.body
+  if (patch.progressPercent !== undefined) body.progress_percent = patch.progressPercent
+  return mapThemeEntry(
+    await apiFetch<ThemeEntryDTO>(`/theme-entries/${entryId}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  )
+}
+
+export async function deleteThemeEntry(entryId: string): Promise<void> {
+  await apiFetch<void>(`/theme-entries/${entryId}/`, { method: 'DELETE' })
+}
+
+export async function requestJoinTheme(
+  themeId: string,
+  message: string,
+): Promise<ThemeJoinRequest> {
+  return mapJoinRequest(
+    await apiFetch<ThemeJoinRequestDTO>(`/themes/${themeId}/join/`, {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    }),
+  )
+}
+
+export async function listJoinRequests(themeId: string): Promise<ThemeJoinRequest[]> {
+  const rows = await apiFetch<ThemeJoinRequestDTO[]>(`/themes/${themeId}/join-requests/`)
+  return rows.map(mapJoinRequest)
+}
+
+export async function resolveJoinRequest(
+  themeId: string,
+  requestId: string,
+  decision: 'approved' | 'rejected',
+): Promise<ThemeJoinRequest> {
+  return mapJoinRequest(
+    await apiFetch<ThemeJoinRequestDTO>(
+      `/themes/${themeId}/join-requests/${requestId}/resolve/`,
+      { method: 'POST', body: JSON.stringify({ status: decision }) },
+    ),
+  )
+}
+
+export async function leaveTheme(themeId: string): Promise<void> {
+  await apiFetch<void>(`/themes/${themeId}/leave/`, { method: 'POST' })
+}
+
+export async function removeThemeMember(themeId: string, memberId: number): Promise<void> {
+  await apiFetch<void>(`/themes/${themeId}/members/${memberId}/`, { method: 'DELETE' })
+}
+
+export async function freezeTheme(themeId: string, reason: string): Promise<Theme> {
+  return mapTheme(
+    await apiFetch<ThemeDTO>(`/themes/${themeId}/freeze/`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  )
+}
+
+export async function reopenTheme(themeId: string): Promise<Theme> {
+  return mapTheme(
+    await apiFetch<ThemeDTO>(`/themes/${themeId}/reopen/`, { method: 'POST' }),
+  )
+}
+
+export async function mergeTheme(
+  themeId: string,
+  targetId: string,
+): Promise<{ merged: Theme; target: Theme }> {
+  const res = await apiFetch<{ merged: ThemeDTO; target: ThemeDTO }>(
+    `/themes/${themeId}/merge/`,
+    { method: 'POST', body: JSON.stringify({ target: targetId }) },
+  )
+  return { merged: mapTheme(res.merged), target: mapTheme(res.target) }
+}
+
+export async function themeSummary(): Promise<ThemeSummary> {
+  const d = await apiFetch<{
+    total: number
+    by_status: Record<ThemeStatus, number>
+    stalled: number
+    stalled_after_days: number
+    idea_open: number
+    frozen_reasons: {
+      id: string
+      title: string
+      reason: string
+      owner: string
+      frozen_at: string | null
+    }[]
+  }>('/themes/summary/')
+  return {
+    total: d.total,
+    byStatus: d.by_status,
+    stalled: d.stalled,
+    stalledAfterDays: d.stalled_after_days,
+    ideaOpen: d.idea_open,
+    frozenReasons: d.frozen_reasons.map((r) => ({
+      id: r.id,
+      title: r.title,
+      reason: r.reason,
+      owner: r.owner,
+      frozenAt: r.frozen_at,
+    })),
+  }
+}
+
+export async function listIdeas(params: { status?: string; q?: string; order?: string; mine?: boolean } = {}): Promise<Idea[]> {
+  const qs = new URLSearchParams()
+  if (params.status) qs.set('status', params.status)
+  if (params.q) qs.set('q', params.q)
+  if (params.order) qs.set('order', params.order)
+  if (params.mine) qs.set('mine', 'true')
+  const s = qs.toString()
+  const rows = await fetchAllPages<IdeaDTO>(`/ideas/${s ? `?${s}` : ''}`)
+  return rows.map(mapIdea)
+}
+
+export async function getIdea(id: string): Promise<Idea> {
+  return mapIdea(await apiFetch<IdeaDTO>(`/ideas/${id}/`))
+}
+
+export interface IdeaInput {
+  title: string
+  body?: string
+  tags?: string[]
+  workCategories?: string[]
+}
+
+export async function createIdea(input: IdeaInput): Promise<Idea> {
+  return mapIdea(
+    await apiFetch<IdeaDTO>('/ideas/', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: input.title,
+        body: input.body ?? '',
+        tags: input.tags ?? [],
+        work_categories: input.workCategories ?? [],
+      }),
+    }),
+  )
+}
+
+export async function updateIdea(id: string, patch: Partial<IdeaInput>): Promise<Idea> {
+  const body: Record<string, unknown> = {}
+  if (patch.title !== undefined) body.title = patch.title
+  if (patch.body !== undefined) body.body = patch.body
+  if (patch.tags !== undefined) body.tags = patch.tags
+  if (patch.workCategories !== undefined) body.work_categories = patch.workCategories
+  return mapIdea(
+    await apiFetch<IdeaDTO>(`/ideas/${id}/`, { method: 'PATCH', body: JSON.stringify(body) }),
+  )
+}
+
+export async function deleteIdea(id: string): Promise<void> {
+  await apiFetch<void>(`/ideas/${id}/`, { method: 'DELETE' })
+}
+
+export async function toggleIdeaVote(
+  id: string,
+): Promise<{ votedByMe: boolean; voteCount: number }> {
+  const d = await apiFetch<{ voted_by_me: boolean; vote_count: number }>(
+    `/ideas/${id}/vote/`,
+    { method: 'POST' },
+  )
+  return { votedByMe: d.voted_by_me, voteCount: d.vote_count }
+}
+
+export async function createIdeaComment(ideaId: string, body: string): Promise<IdeaComment> {
+  return mapIdeaComment(
+    await apiFetch<IdeaCommentDTO>(`/ideas/${ideaId}/comments/`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    }),
+  )
+}
+
+export async function deleteIdeaComment(commentId: string): Promise<void> {
+  await apiFetch<void>(`/idea-comments/${commentId}/`, { method: 'DELETE' })
+}
+
+/** アイデアをテーマに昇格させる。手を挙げた人が発起人になる。 */
+export async function promoteIdea(
+  ideaId: string,
+  overrides: { title?: string; summary?: string; body?: string } = {},
+): Promise<Theme> {
+  return mapTheme(
+    await apiFetch<ThemeDTO>(`/ideas/${ideaId}/promote/`, {
+      method: 'POST',
+      body: JSON.stringify(overrides),
+    }),
+  )
 }
