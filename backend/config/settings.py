@@ -32,7 +32,39 @@ ALLOWED_HOSTS = os.environ.get(
 ).split(",")
 
 # External integration (Microsoft Teams notifications for access requests, etc.)
+# 旧: Teams Incoming Webhook へ MessageCard を直接投げる経路。
+# Microsoft がこの種のコネクタを廃止する方針のため、新規は下の
+# POWER_AUTOMATE_WEBHOOK_URL を使う（両方設定されている場合は
+# 二重通知を避けるため Power Automate 側だけが動く）。
 TEAMS_WEBHOOK_URL = os.environ.get("TEAMS_WEBHOOK_URL", "")
+
+# --------------------------------------------------------------------------- #
+# 通知（Power Automate 連携）
+# --------------------------------------------------------------------------- #
+# Power Automate の「HTTP 要求の受信時」トリガーが発行する URL。
+# 全イベントをこの1本に投げ、フロー側の Switch で振り分ける想定。
+# URL には SAS 署名が含まれるので、実質的な認証情報として扱うこと。
+POWER_AUTOMATE_WEBHOOK_URL = os.environ.get("POWER_AUTOMATE_WEBHOOK_URL", "")
+
+# 送信するイベントをカンマ区切りで限定する。空なら全イベントを送る。
+# 例: NOTIFY_EVENTS=tool.created,access_request.created
+NOTIFY_EVENTS = os.environ.get("NOTIFY_EVENTS", "")
+
+# 宛先が特定できないイベント（ツール登録の周知など）で使う既定の宛先。
+NOTIFY_DEFAULT_EMAILS = os.environ.get("NOTIFY_DEFAULT_EMAILS", "")
+
+# フロー側で「想定外の送信元を弾く」ための合言葉。X-AITC-Token で送る。
+NOTIFY_SHARED_TOKEN = os.environ.get("NOTIFY_SHARED_TOKEN", "")
+
+NOTIFY_TIMEOUT_SECONDS = float(os.environ.get("NOTIFY_TIMEOUT_SECONDS", "8"))
+
+# True にすると同期送信になる（テスト用）。既定は別スレッドで送るので、
+# Webhook が遅くても画面側の応答は待たされない。
+NOTIFY_SYNC = os.environ.get("NOTIFY_SYNC", "").lower() == "true"
+
+# 通知に載せるリンクのベース URL。未設定なら FRONTEND_PORT から組み立てる
+# （社内配布時は localhost ではないので明示すること）。
+FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "")
 
 # フィードバックメールの宛先（カンマ区切り）。未設定なら admin/tool_admin の
 # メールアドレスを宛先にする。送信自体はクライアントの mailto:（Outlook 等）。
@@ -59,6 +91,7 @@ INSTALLED_APPS = [
     "docs",
     "forum",
     "themes",
+    "notifications",
 ]
 
 MIDDLEWARE = [

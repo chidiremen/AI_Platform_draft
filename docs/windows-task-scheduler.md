@@ -12,6 +12,7 @@
 | `start.bat` | 起動。タスクスケジューラに登録するのはこれ |
 | `stop.bat` | 停止。ポートを LISTEN しているプロセスを落とす |
 | `doctor.bat` | セットアップ診断（読み取り専用）。ログインできない等の切り分けに使う |
+| `scripts\notify_stalled.bat` | 停滞テーマの週次通知（タスクスケジューラに週1で登録） |
 | `scripts\load_env.bat` | `.env` から `FRONTEND_PORT` / `BACKEND_PORT` を読む共通処理 |
 | `scripts\run_backend.bat` | Django を実際に起動する子スクリプト（`start.bat` から呼ばれる） |
 | `scripts\run_frontend.bat` | Vite を実際に起動する子スクリプト（同上） |

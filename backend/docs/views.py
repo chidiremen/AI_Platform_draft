@@ -9,6 +9,8 @@ from rest_framework.response import Response
 
 from accounts.permissions import is_admin
 
+from notifications import hooks as notify
+
 from .models import Answer, DocAttachment, DocCategory, GuideArticle, Question
 from .permissions import (
     IsAdminOrReadOnly,
@@ -98,7 +100,9 @@ class QuestionViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(asker=self.request.user)
+        question = serializer.save(asker=self.request.user)
+        # 回答するのはツール管理者なので、質問の滞留を防ぐために通知する
+        notify.question_created(question)
 
     def retrieve(self, request, *args, **kwargs):
         obj = self.get_object()
@@ -135,7 +139,9 @@ class AnswerViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        answer = serializer.save(author=self.request.user)
+        # 回答が付いたことを知りたいのは質問者本人
+        notify.answer_created(answer)
 
     @action(
         detail=True,

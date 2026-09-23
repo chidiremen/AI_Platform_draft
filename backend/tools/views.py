@@ -11,6 +11,8 @@ from rest_framework.viewsets import ModelViewSet
 from accounts.permissions import IsAuthorOrAdminOrReadOnly, is_admin
 
 from .models import AccessRequest, Comment, CommentLike, Like, Screenshot, Tool
+from notifications import hooks as notify
+
 from .notifications import notify_access_request
 from .serializers import (
     AccessRequestSerializer,
@@ -38,6 +40,15 @@ class ToolViewSet(ModelViewSet):
         if self.action in ("create", "update", "partial_update"):
             return ToolWriteSerializer
         return ToolSerializer
+
+    def perform_create(self, serializer):
+        tool = serializer.save()
+        # 部門への周知。ベストエフォートなので失敗しても登録は成功扱い。
+        notify.tool_created(tool)
+
+    def perform_update(self, serializer):
+        tool = serializer.save()
+        notify.tool_updated(tool, actor=self.request.user)
 
     def get_queryset(self):
         qs = (
@@ -170,7 +181,9 @@ class ToolViewSet(ModelViewSet):
             tool=tool,
             reason=request.data.get("reason", ""),
         )
-        # 登録者へ Teams 通知（ベストエフォート。未設定/失敗でも申請は成功扱い）
+        # 登録者へ通知（ベストエフォート。未設定/失敗でも申請は成功扱い）
+        notify.access_request_created(req)
+        # 旧 Teams Incoming Webhook 経路。Power Automate 未設定のときだけ動く。
         notify_access_request(req)
         return Response(
             AccessRequestSerializer(req).data,
@@ -342,6 +355,7 @@ class AccessRequestResolveView(generics.UpdateAPIView):
         req.status = new_status
         req.resolved_at = timezone.now()
         req.save(update_fields=["status", "resolved_at"])
+        notify.access_request_resolved(req, actor=request.user)
         return Response(AccessRequestSerializer(req).data)
 
     def post(self, request, *args, **kwargs):
@@ -408,7 +422,8 @@ class ToolCommentsView(generics.ListCreateAPIView):
         tool = Tool.objects.filter(id=tool_id).first()
         if not tool:
             raise Http404("ツールが見つかりません。")
-        serializer.save(author=self.request.user, tool=tool)
+        comment = serializer.save(author=self.request.user, tool=tool)
+        notify.comment_created(comment)
 
 
 class CommentDetailView(generics.RetrieveUpdateDestroyAPIView):

@@ -18,21 +18,53 @@ from __future__ import annotations
 import io
 from pathlib import Path
 
-#: 試す順。utf-8-sig は BOM 付き/無し両方の UTF-8 を吸収する。
-#: utf-16 はメモ帳の「Unicode」保存。cp932 は日本語 Windows の「ANSI」。
-#: latin-1 はどんなバイト列でも失敗しない最後の砦で、日本語コメントは
-#: 文字化けするが `KEY=VALUE` 行（ASCII）は正しく読めるため実害が小さい。
-ENCODINGS = ("utf-8-sig", "utf-16", "cp932", "latin-1")
+#: BOM 無しでも試すエンコーディング。utf-8-sig は BOM 付き/無し両方の UTF-8 を
+#: 吸収する。cp932 は日本語 Windows の「ANSI」。latin-1 はどんなバイト列でも
+#: 失敗しない最後の砦で、日本語コメントは化けるが `KEY=VALUE` 行（ASCII）は
+#: 正しく読めるため実害が小さい。
+ENCODINGS = ("utf-8-sig", "cp932", "latin-1")
+
+#: UTF-16 の BOM。メモ帳の「Unicode」保存がこれ。
+UTF16_BOMS = (b"\xff\xfe", b"\xfe\xff")
+
+
+def _candidate_encodings(raw: bytes):
+    """試す順にエンコーディングを返す。
+
+    utf-16 は **BOM がある時だけ** 候補にする。BOM 無しの UTF-16 を推測で
+    デコードすると、たまたま例外が出ずに全く別の文字列になってしまい
+    （例: b"\x00\x01\x00\x02" が "ĀȀ" になる）、設定を静かにゴミで
+    埋めることになるため。
+    """
+    if raw.startswith(UTF16_BOMS):
+        yield "utf-16"
+    yield from ENCODINGS
+
+
+def decode_env_bytes_with_encoding(raw: bytes) -> tuple[str, str] | None:
+    """デコード結果と、使えたエンコーディング名を返す。読めなければ None。
+
+    「例外が出なかった＝正しく読めた」ではない点に注意。latin-1 はどんな
+    バイト列でも通ってしまうので、バイナリを食わせると文字化けしたテキストが
+    出来上がり、python-dotenv が意味のない行を延々と警告しながら設定を
+    中途半端に読み込む。設定を黙ってゴミで埋めるくらいなら読まない方が
+    マシなので、NUL を含む結果は失敗とみなす（まともな .env に NUL は無い）。
+    """
+    for enc in _candidate_encodings(raw):
+        try:
+            text = raw.decode(enc)
+        except (UnicodeDecodeError, UnicodeError, LookupError):
+            continue
+        if "\x00" in text:
+            continue
+        return text, enc
+    return None
 
 
 def decode_env_bytes(raw: bytes) -> str | None:
     """`.env` のバイト列をデコードする。どれでも読めなければ None。"""
-    for enc in ENCODINGS:
-        try:
-            return raw.decode(enc)
-        except (UnicodeDecodeError, UnicodeError, LookupError):
-            continue
-    return None
+    found = decode_env_bytes_with_encoding(raw)
+    return found[0] if found else None
 
 
 def load_env_file(path) -> bool:

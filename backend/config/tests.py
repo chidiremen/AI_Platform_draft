@@ -69,12 +69,24 @@ class EnvFileEncodingTests(SimpleTestCase):
         """どんなバイト列でも例外を外に出さない（.env は任意の設定ファイル）。"""
         path = self._write(bytes(range(256)) * 4)
         try:
-            load_env_file(path)
+            loaded = load_env_file(path)
         except Exception as exc:  # pragma: no cover
             self.fail(f"例外が漏れた: {exc!r}")
+        # 文字化けしたテキストを中途半端に読み込むより、読まない方がよい
+        self.assertFalse(loaded)
 
-    def test_decode_env_bytes_never_fails_on_arbitrary_bytes(self):
-        self.assertIsNotNone(decode_env_bytes(b"\x83\x81\x83\x82\xff\xfe\x00"))
+    def test_garbage_is_rejected_rather_than_half_parsed(self):
+        """latin-1 は何でも通してしまうので、NUL を含む結果は失敗扱いにする。
+
+        これが無いと、BOM なし UTF-16 やバイナリを食わせたときに
+        python-dotenv が無意味な行を警告しながら設定を half-parse する。
+        """
+        self.assertIsNone(decode_env_bytes(b"\x00\x01\x00\x02\x00\x03"))
+        self.assertIsNone(decode_env_bytes(bytes(range(256)) * 4))
+
+    def test_valid_text_is_still_decoded(self):
+        self.assertEqual(decode_env_bytes("A=1\n".encode("utf-8")), "A=1\n")
+        self.assertIn("A", decode_env_bytes("# 日本語\nA=1\n".encode("cp932")))
 
     def test_first_file_wins(self):
         """load_env_files は先に読んだ側を優先する（override=False の既定）。"""

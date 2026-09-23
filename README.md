@@ -104,6 +104,23 @@ npm run preview  # ビルド結果のプレビュー
 - **凍結も成果** — 理由を必須にして、失敗の中身を知見として蓄積
 - **停滞の自動表示** — 一定期間進捗が無いテーマにバッジ（既定30日、`.env` で変更可）
 
+## 通知（Power Automate 連携）
+
+ツール登録・申請・コメント・テーマの進捗や凍結などを Power Automate へ
+HTTP で投げ、Teams チャネルと Outlook メールに振り分けます。
+手順は [`docs/notifications.md`](docs/notifications.md)。
+
+```
+python manage.py send_test_event                      # 送れるイベント一覧
+python manage.py send_test_event tool.created --dry-run  # ペイロード確認
+python manage.py notify_stalled_themes                # 停滞テーマの定期通知
+```
+
+- 全イベントを1本の URL に投げ、フロー側の Switch で振り分ける設計
+- `recipients.to` に宛先メールが入る（Teams の個人チャットが使えないため）
+- 通知が失敗しても本来の処理（ツール登録など）は成功する
+- 送信結果は管理画面の「Webhook送信ログ」で確認できる
+
 ## ディレクトリ構成
 
 ```

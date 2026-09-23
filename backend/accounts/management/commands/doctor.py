@@ -16,7 +16,7 @@ from django.core.management.base import BaseCommand
 from django.db import connections
 from django.db.migrations.executor import MigrationExecutor
 
-from config.envfile import ENCODINGS
+from config.envfile import decode_env_bytes_with_encoding
 
 MARK = "★"
 
@@ -87,13 +87,10 @@ class Command(BaseCommand):
             raw = path.read_bytes()
         except OSError:
             return None
-        for enc in ENCODINGS:
-            try:
-                raw.decode(enc)
-                return enc
-            except (UnicodeDecodeError, UnicodeError, LookupError):
-                continue
-        return None
+        # 判定ロジックは envfile と共有する。doctor だけ別実装にすると
+        # 「診断では読めると出るのに Django は読めない」がいずれ起きる。
+        found = decode_env_bytes_with_encoding(raw)
+        return found[1] if found else None
 
     def _section_db(self):
         self._head("データベース")

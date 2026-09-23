@@ -37,7 +37,16 @@ def build_card(access_request) -> dict:
 
 
 def notify_access_request(access_request) -> bool:
-    """Webhook へ通知を送る。送信したら True、未設定/失敗なら False。"""
+    """Webhook へ通知を送る。送信したら True、未設定/失敗なら False。
+
+    これは Teams Incoming Webhook（MessageCard）に直接投げる旧経路。
+    Microsoft がこの種のコネクタを廃止していく方針のため、新しい通知は
+    ``notifications`` アプリ（Power Automate 連携）に寄せている。
+    Power Automate 側が設定されている場合はそちらが送るので、二重通知を
+    避けるためにここでは何もしない。
+    """
+    if getattr(settings, "POWER_AUTOMATE_WEBHOOK_URL", ""):
+        return False
     url = getattr(settings, "TEAMS_WEBHOOK_URL", "") or ""
     if not url:
         return False

@@ -22,6 +22,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from accounts.permissions import is_admin
+from notifications import hooks as notify
 
 from .models import (
     Idea,
@@ -117,6 +118,8 @@ class ThemeViewSet(viewsets.ModelViewSet):
             theme=theme, user=self.request.user, role=ThemeMember.Role.OWNER
         )
         _log(theme, "テーマを登録しました。")
+        # 重複開発の抑止が目的なので、着手を早く広く知らせる
+        notify.theme_created(theme)
 
     def retrieve(self, request, *args, **kwargs):
         theme = self.get_object()
@@ -201,6 +204,7 @@ class ThemeViewSet(viewsets.ModelViewSet):
         )
         if entry.kind == ThemeEntry.Kind.PROGRESS:
             theme.touch_progress(entry.created_at)
+            notify.theme_progress(theme, entry)
         return Response(
             self.get_entry_serializer(entry).data, status=status.HTTP_201_CREATED
         )
@@ -315,6 +319,8 @@ class ThemeViewSet(viewsets.ModelViewSet):
         theme.frozen_at = timezone.now()
         theme.save(update_fields=["status", "freeze_reason", "frozen_at", "updated_at"])
         _log(theme, f"テーマを凍結しました。理由: {theme.freeze_reason}")
+        # 失敗の知見こそ共有したいので、理由ごと通知する
+        notify.theme_frozen(theme, actor=request.user)
         return Response(self.get_serializer(theme).data)
 
     @action(detail=True, methods=["post"], url_path="reopen")
@@ -484,7 +490,9 @@ class IdeaViewSet(viewsets.ModelViewSet):
         return ctx
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        idea = serializer.save(author=self.request.user)
+        # 作れる人の目に触れることが目的
+        notify.idea_created(idea)
 
     @action(detail=True, methods=["post"], url_path="vote")
     def vote(self, request, pk=None):
