@@ -228,7 +228,7 @@ export default function ThemeFormPage() {
             <button
               key={c.id}
               type="button"
-              className={`chip ${categories.includes(c.id) ? 'chip-on' : ''}`}
+              className={`chip ${categories.includes(c.id) ? 'active' : ''}`}
               onClick={() => toggleCategory(c.id)}
             >
               {c.icon} {c.name}

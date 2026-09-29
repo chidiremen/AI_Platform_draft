@@ -49,6 +49,16 @@ if errorlevel 1 goto :fail
 :py_ok
 call :log "python: %PY%"
 
+rem ---- stale vite config --------------------------------------------
+rem  A leftover frontend\vite.config.js (emitted by an old "tsc -b") makes
+rem  Vite ignore vite.config.ts. envDir then never points at the project
+rem  root, so .env is not read at all and the app silently starts in MOCK
+rem  mode - editing or even deleting .env changes nothing. Refuse to start.
+if not exist "%ROOT%frontend\vite.config.js" goto :vite_config_ok
+call :log "[ERROR] frontend\vite.config.js exists. It shadows vite.config.ts, so .env is ignored and the app runs in MOCK mode. Delete that file and start again."
+goto :fail
+:vite_config_ok
+
 rem ---- node ---------------------------------------------------------
 where npm >nul 2>&1
 if errorlevel 1 call :log "[ERROR] npm not found on PATH. Install Node.js, or run the task as a user that has Node on PATH."

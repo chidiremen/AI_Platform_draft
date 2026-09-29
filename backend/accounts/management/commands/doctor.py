@@ -29,6 +29,7 @@ class Command(BaseCommand):
         self.stdout.write("")
         self.stdout.write("=== AI Tool Catalog セットアップ診断 ===")
         self._section_env()
+        self._section_frontend()
         self._section_db()
         self._section_users()
         self._section_media()
@@ -91,6 +92,26 @@ class Command(BaseCommand):
         # 「診断では読めると出るのに Django は読めない」がいずれ起きる。
         found = decode_env_bytes_with_encoding(raw)
         return found[1] if found else None
+
+    def _section_frontend(self):
+        self._head("フロントエンド")
+        root = Path(settings.BASE_DIR).parent
+        # tsc -b の残骸。あると Vite が vite.config.ts を無視するため、
+        # ルートの .env が読まれずモックモードから抜けられなくなる。
+        stale = [
+            root / "frontend" / name
+            for name in ("vite.config.js", "vite.config.cjs", "vite.config.mjs")
+        ]
+        found = [p for p in stale if p.is_file()]
+        if found:
+            self._row(
+                "vite設定の残骸",
+                ", ".join(p.name for p in found),
+                "削除してください。これがあると vite.config.ts が無視され、"
+                ".env が読まれずモックモードのままになります",
+            )
+        else:
+            self._row("vite設定の残骸", "なし")
 
     def _section_db(self):
         self._head("データベース")

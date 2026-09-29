@@ -88,13 +88,13 @@ function IdeaList() {
       <div className="theme-toolbar">
         <div className="theme-filters">
           <button
-            className={`chip ${openOnly ? 'chip-on' : ''}`}
+            className={`chip ${openOnly ? 'active' : ''}`}
             onClick={() => setOpenOnly(true)}
           >
             募集中
           </button>
           <button
-            className={`chip ${!openOnly ? 'chip-on' : ''}`}
+            className={`chip ${!openOnly ? 'active' : ''}`}
             onClick={() => setOpenOnly(false)}
           >
             すべて

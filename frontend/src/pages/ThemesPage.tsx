@@ -147,7 +147,7 @@ function ThemeList() {
           {FILTERS.map((f) => (
             <button
               key={f.key}
-              className={`chip ${filter === f.key ? 'chip-on' : ''}`}
+              className={`chip ${filter === f.key ? 'active' : ''}`}
               onClick={() => setFilter(f.key)}
             >
               {f.label}

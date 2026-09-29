@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Header from './components/Header'
+import ModeBanner from './components/ModeBanner'
 import HomePage from './pages/HomePage'
 import ToolDetailPage from './pages/ToolDetailPage'
 import ToolFormPage from './pages/ToolFormPage'
@@ -38,7 +39,12 @@ function AuthedApp() {
 
   // 未ログイン時はログイン画面のみ（社内プラットフォームのため全体を認証ゲート）
   if (!currentUser) {
-    return <LoginPage />
+    return (
+      <>
+        <ModeBanner />
+        <LoginPage />
+      </>
+    )
   }
 
   return (
@@ -46,6 +52,7 @@ function AuthedApp() {
       <ForumProvider>
         <ThemeProvider>
         <div className="app-shell">
+          <ModeBanner />
           <Header />
           <main>
             <Routes>

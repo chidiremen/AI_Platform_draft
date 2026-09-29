@@ -2841,6 +2841,10 @@ button.shot {
 
 /* ─────────────────────────────────────────────────────────────
    テーマ / アイデア（進行中の取り組み）
+
+   配色はすべて :root のトークンを使う。アプリはダークブルー基調なので、
+   ここで白背景やライトグレーの文字をベタ書きすると浮くうえ、文字が
+   読めなくなる（一度やらかした）。
    ───────────────────────────────────────────────────────────── */
 .themes-page .theme-head {
   display: flex;
@@ -2860,7 +2864,7 @@ button.shot {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  margin: 16px 0 20px;
+  margin: 18px 0 20px;
 }
 .theme-filters {
   display: flex;
@@ -2869,7 +2873,7 @@ button.shot {
 }
 .theme-filter-count {
   margin-left: 6px;
-  opacity: 0.6;
+  opacity: 0.7;
   font-variant-numeric: tabular-nums;
 }
 .theme-search {
@@ -2877,155 +2881,172 @@ button.shot {
   max-width: 340px;
 }
 
-/* ステータスのピル */
+/* ── ステータスのピル ──
+   ダーク背景なので、塗りは半透明の色味＋同系の明るい文字にする。 */
 .theme-pill {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 10px;
+  padding: 3px 10px;
   border-radius: 999px;
+  border: 1px solid transparent;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
 }
 .theme-pill-active {
-  background: #e3f0ff;
-  color: #14508c;
+  background: rgba(58, 141, 222, 0.18);
+  border-color: rgba(79, 157, 222, 0.5);
+  color: var(--accent-bright);
 }
 .theme-pill-recruiting,
 .theme-pill-recruit-cta {
-  background: #fff1dc;
-  color: #8a5300;
+  background: rgba(224, 164, 88, 0.16);
+  border-color: rgba(224, 164, 88, 0.45);
+  color: var(--amber);
 }
 .theme-pill-frozen {
-  background: #e8ecf1;
-  color: #4a5a6a;
+  background: rgba(159, 177, 204, 0.14);
+  border-color: rgba(159, 177, 204, 0.35);
+  color: var(--text-muted);
 }
 .theme-pill-done {
-  background: #e3f6e8;
-  color: #1c6b39;
+  background: rgba(65, 199, 154, 0.16);
+  border-color: rgba(65, 199, 154, 0.45);
+  color: var(--success);
 }
 .theme-pill-merged {
-  background: #efe7fb;
-  color: #5a3a95;
+  background: rgba(184, 138, 214, 0.16);
+  border-color: rgba(184, 138, 214, 0.45);
+  color: var(--purple);
 }
-/* 停滞は「異常」ではなく「気づき」なので、赤ではなく琥珀で出す */
+/* 停滞は「異常」ではなく「気づき」なので、危険色ではなく琥珀で出す */
 .theme-pill-stalled {
-  background: #fdeede;
-  color: #9a4b12;
-  border: 1px solid #f0c9a4;
+  background: rgba(224, 164, 88, 0.22);
+  border-color: var(--amber);
+  color: #f0c58a;
 }
 
-/* 一覧カード */
+/* ── 一覧カード ── */
 .theme-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 .theme-card {
   display: flex;
-  gap: 12px;
-  border: 1px solid var(--border, #e3e7ec);
-  border-radius: 12px;
-  background: #fff;
-  transition: box-shadow 0.15s, border-color 0.15s;
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 .theme-card:hover {
-  border-color: #c7d4e2;
-  box-shadow: 0 2px 10px rgba(20, 40, 70, 0.07);
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: var(--shadow);
 }
 .theme-card-main {
   display: block;
   flex: 1 1 auto;
-  padding: 14px 16px;
-  color: inherit;
+  padding: 16px 18px;
+  color: var(--text);
   text-decoration: none;
   min-width: 0;
+}
+.theme-card-main:hover {
+  text-decoration: none;
 }
 .theme-card-head {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .theme-card-title {
-  margin: 0 0 4px;
+  margin: 0 0 5px;
   font-size: 16px;
   font-weight: 700;
+  color: var(--text);
 }
 .theme-card-summary {
-  margin: 0 0 8px;
-  color: #56616e;
+  margin: 0 0 10px;
+  color: var(--text-muted);
   font-size: 13px;
 }
 .theme-card-progress {
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   font-size: 13px;
-  color: #35404c;
+  color: var(--text);
 }
 .theme-card-progress-label {
   display: inline-block;
   margin-right: 8px;
-  padding: 1px 6px;
+  padding: 1px 7px;
   border-radius: 4px;
-  background: #eef2f6;
+  background: var(--bg-700);
+  border: 1px solid var(--border-soft);
   font-size: 11px;
-  color: #5a6672;
+  color: var(--text-muted);
 }
 .theme-card-freeze {
-  margin: 0 0 6px;
-  padding: 6px 10px;
-  border-left: 3px solid #b9c3cd;
-  background: #f6f8fa;
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--text-dim);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--bg-700);
   font-size: 12px;
-  color: #4a5561;
+  color: var(--text-muted);
 }
 .theme-card-meta {
   display: flex;
   gap: 14px;
   flex-wrap: wrap;
   font-size: 12px;
-  color: #77828e;
+  /* --text-dim だとカード背景に対して 3.5:1 程度しか出ず読みづらかったので
+     --text-muted（約6.7:1）にしている。 */
+  color: var(--text-muted);
 }
 .theme-card-tags {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
-/* 進捗バー */
+/* ── 進捗バー ── */
 .theme-progress {
   position: relative;
   height: 6px;
   border-radius: 3px;
-  background: #eef2f6;
-  margin: 8px 0;
-  max-width: 320px;
+  background: var(--bg-700);
+  border: 1px solid var(--border-soft);
+  margin: 10px 0;
+  max-width: 300px;
 }
 .theme-progress-bar {
   height: 100%;
   border-radius: 3px;
-  background: linear-gradient(90deg, #4f9dd8, #3ec2a6);
+  background: linear-gradient(90deg, var(--accent), var(--teal));
 }
 .theme-progress-label {
   position: absolute;
-  right: -34px;
-  top: -5px;
+  right: -36px;
+  top: -6px;
   font-size: 11px;
-  color: #77828e;
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
-/* 詳細 */
+/* ── 詳細 ── */
 .theme-detail-head {
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 .theme-detail-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
+  grid-template-columns: minmax(0, 1fr) 290px;
   gap: 20px;
   align-items: start;
 }
@@ -3036,52 +3057,58 @@ button.shot {
 }
 .theme-detail-side {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 .theme-banner {
-  padding: 12px 16px;
-  border-radius: 10px;
-  background: #eef4fb;
-  border: 1px solid #d3e1f1;
-  margin-bottom: 14px;
+  padding: 13px 16px;
+  border-radius: var(--radius-sm);
+  background: rgba(58, 141, 222, 0.12);
+  border: 1px solid rgba(79, 157, 222, 0.4);
+  color: var(--text);
+  margin-bottom: 16px;
   font-size: 14px;
 }
 .theme-banner-frozen {
-  background: #f4f6f8;
-  border-color: #dde3e9;
+  background: var(--bg-700);
+  border-color: var(--border);
+}
+.theme-banner-frozen strong {
+  color: var(--text-muted);
 }
 .theme-banner-frozen p {
-  margin: 6px 0;
+  margin: 8px 0;
+  color: var(--text);
 }
 .theme-banner-done {
-  background: #eef9f1;
-  border-color: #cbe8d5;
+  background: rgba(65, 199, 154, 0.12);
+  border-color: rgba(65, 199, 154, 0.4);
 }
 .theme-inline-cta {
   margin-left: 8px;
 }
 .theme-origin {
-  margin: -6px 0 14px;
+  margin: -6px 0 16px;
   font-size: 13px;
 }
 .theme-body {
   margin-bottom: 16px;
+  color: var(--text);
 }
 
-/* タイムライン（軌跡） */
+/* ── タイムライン（軌跡） ── */
 .theme-timeline {
   list-style: none;
-  margin: 0 0 16px;
+  margin: 0 0 18px;
   padding: 0 0 0 4px;
-  position: relative;
 }
 .theme-entry {
   position: relative;
-  padding: 0 0 16px 22px;
-  border-left: 2px solid #e6ebf0;
+  padding: 0 0 18px 22px;
+  border-left: 2px solid var(--border-soft);
 }
 .theme-entry:last-child {
   border-left-color: transparent;
+  padding-bottom: 4px;
 }
 .theme-entry-dot {
   position: absolute;
@@ -3090,13 +3117,13 @@ button.shot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #7fa8cd;
+  background: var(--accent);
 }
 .theme-entry-comment .theme-entry-dot {
-  background: #b9c3cd;
+  background: var(--text-dim);
 }
 .theme-entry-system .theme-entry-dot {
-  background: #dfe5ea;
+  background: var(--border);
 }
 .theme-entry-head {
   display: flex;
@@ -3104,32 +3131,40 @@ button.shot {
   gap: 10px;
   flex-wrap: wrap;
   font-size: 12px;
-  color: #77828e;
-  margin-bottom: 4px;
+  color: var(--text-dim);
+  margin-bottom: 5px;
 }
 .theme-entry-kind {
-  font-weight: 600;
-  color: #35404c;
+  font-weight: 700;
+  color: var(--text);
+}
+.theme-entry-author {
+  color: var(--text-muted);
 }
 .theme-entry-percent {
-  padding: 1px 6px;
+  padding: 1px 7px;
   border-radius: 4px;
-  background: #eaf3fb;
-  color: #17567f;
+  background: rgba(58, 141, 222, 0.18);
+  color: var(--accent-bright);
   font-variant-numeric: tabular-nums;
 }
 .theme-entry-system-text {
   font-size: 12px;
-  color: #8b95a1;
+  color: var(--text-dim);
 }
 .theme-entry-system .theme-entry-body {
   display: flex;
   gap: 10px;
   align-items: baseline;
+  flex-wrap: wrap;
 }
 .theme-entry-date {
   font-size: 11px;
-  color: #9aa4ae;
+  color: var(--text-dim);
+}
+.theme-entry-md {
+  color: var(--text);
+  font-size: 14px;
 }
 .theme-entry-md p:first-child {
   margin-top: 0;
@@ -3139,77 +3174,87 @@ button.shot {
 }
 
 .theme-entry-form {
-  border-top: 1px solid #edf1f4;
-  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 16px;
 }
 .theme-entry-kind-row {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 8px;
+  gap: 16px;
+  margin-bottom: 10px;
   font-size: 13px;
+  color: var(--text-muted);
   flex-wrap: wrap;
 }
 .theme-entry-kind-row label {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   cursor: pointer;
 }
 .theme-percent-input {
-  width: 92px;
+  width: 96px;
 }
 
-/* メンバー / 申請 */
+/* ── メンバー / 申請 ── */
 .theme-member-list,
 .theme-request-list {
   list-style: none;
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   padding: 0;
   font-size: 13px;
+  color: var(--text);
 }
 .theme-member-list li {
-  padding: 4px 0;
+  padding: 5px 0;
 }
 .theme-owner-tag {
   margin-left: 6px;
-  padding: 1px 6px;
+  padding: 1px 7px;
   border-radius: 4px;
-  background: #eef2f6;
+  background: var(--bg-700);
+  border: 1px solid var(--border-soft);
   font-size: 11px;
-  color: #5a6672;
+  color: var(--text-muted);
 }
 .theme-request-list li {
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f3f6;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.theme-request-list li:last-child {
+  border-bottom: none;
 }
 .theme-request-actions {
   display: flex;
   gap: 6px;
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
-/* 登録フォーム */
+/* ── 登録フォーム ── */
 .theme-form .label {
-  margin-top: 14px;
+  margin-top: 16px;
 }
 .theme-form .label:first-child {
   margin-top: 0;
 }
 .theme-similar {
-  margin: 10px 0 4px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: #fff8e9;
-  border: 1px solid #f0dcb0;
+  margin: 12px 0 4px;
+  padding: 13px 15px;
+  border-radius: var(--radius-sm);
+  background: rgba(224, 164, 88, 0.12);
+  border: 1px solid rgba(224, 164, 88, 0.45);
   font-size: 13px;
+  color: var(--text);
+}
+.theme-similar strong {
+  color: var(--amber);
 }
 .theme-similar ul {
   margin: 8px 0 0;
   padding-left: 18px;
 }
 .theme-similar p {
-  margin: 4px 0 0;
+  margin: 5px 0 0;
 }
 .theme-status-choice {
   display: flex;
@@ -3220,21 +3265,29 @@ button.shot {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
-  border: 1px solid var(--border, #e3e7ec);
-  border-radius: 10px;
+  padding: 11px 15px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-700);
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 13px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.theme-status-option:hover {
+  border-color: var(--accent);
 }
 .theme-status-option.on {
-  border-color: #7fa8cd;
-  background: #f2f8fd;
+  border-color: var(--accent-bright);
+  background: rgba(79, 157, 222, 0.16);
+  color: var(--text);
 }
 .theme-status-label {
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--text);
 }
 
-/* アイデア */
+/* ── アイデア ── */
 .idea-card {
   align-items: stretch;
 }
@@ -3244,21 +3297,23 @@ button.shot {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  width: 58px;
+  width: 60px;
   flex-shrink: 0;
   border: none;
-  border-right: 1px solid #eef1f4;
-  background: #fafbfc;
-  border-radius: 12px 0 0 12px;
+  border-right: 1px solid var(--border-soft);
+  background: var(--bg-700);
+  border-radius: var(--radius) 0 0 var(--radius);
   cursor: pointer;
-  color: #7a858f;
+  color: var(--text-muted);
+  transition: background 0.15s, color 0.15s;
 }
 .idea-vote:hover {
-  background: #f2f6fa;
+  background: var(--bg-600);
+  color: var(--text);
 }
 .idea-vote.on {
-  background: #eaf4ff;
-  color: #1a67ab;
+  background: rgba(58, 141, 222, 0.2);
+  color: var(--accent-bright);
 }
 .idea-vote-icon {
   font-size: 14px;
@@ -3272,26 +3327,55 @@ button.shot {
 .idea-actions {
   display: flex;
   gap: 10px;
-  margin: 14px 0;
+  margin: 16px 0;
   flex-wrap: wrap;
 }
 
 /* ダッシュボードの凍結ダイジェスト */
 .theme-frozen-digest {
   list-style: none;
-  margin: 8px 0 14px;
+  margin: 10px 0 16px;
   padding: 0;
   display: grid;
   gap: 10px;
 }
 .theme-frozen-digest li {
-  padding: 10px 12px;
-  border-left: 3px solid #b9c3cd;
-  background: #f7f9fb;
-  border-radius: 0 8px 8px 0;
+  padding: 11px 14px;
+  border-left: 3px solid var(--text-dim);
+  background: var(--bg-700);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   font-size: 13px;
+  color: var(--text);
 }
 .theme-frozen-digest p {
-  margin: 4px 0 0;
-  color: #56616e;
+  margin: 5px 0 0;
+  color: var(--text-muted);
+}
+
+/* モックモードの警告帯。設定ミスに気づけないのが一番困るので目立たせる。 */
+.mode-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  padding: 10px 20px;
+  background: linear-gradient(90deg, #5a3a12, #6b4516);
+  border-bottom: 1px solid var(--amber);
+  color: #ffe6bf;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.mode-banner strong {
+  color: var(--amber);
+  white-space: nowrap;
+}
+.mode-banner code {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #ffd9a0;
+  font-size: 12px;
+}
+.mode-banner-how {
+  color: #e8cfa8;
 }

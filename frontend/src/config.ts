@@ -1,20 +1,45 @@
 /**
  * 実行時設定。
  *
- * フロントエンドは既定で「モックモード」（バックエンド不要・全データはメモリ内）で動作する。
- * バックエンド（Django + DRF）に接続するには、ビルド/起動時に環境変数を設定する:
+ * ## モード判定の方針
  *
- *   VITE_USE_MOCK=false        … 実APIモードに切り替え
- *   VITE_API_BASE=...          … APIのベースURL（既定 http://localhost:8009/api）
+ * 既定は **実APIモード**。モックは `VITE_USE_MOCK=true` を明示したときだけ。
  *
- * 例（.env.local もしくは起動時）:
- *   VITE_USE_MOCK=false VITE_API_BASE=http://localhost:8009/api npm run dev
+ * 以前は逆（未設定ならモック）だったが、これは危険だった。設定が届かない
+ * 事故（後述）が起きたとき、画面は何事もなく立ち上がり、ソースに埋め込まれた
+ * デモユーザーでログインできてしまう。「DBのアカウントで入れない」という
+ * 分かりにくい症状になり、原因に辿り着くまで時間を溶かす。
+ * 実APIを既定にしておけば、設定が届かなければ「バックエンドに繋がらない」と
+ * 素直に失敗するので、すぐ気づける。
+ *
+ * ## 設定が届かない事故の実例
+ *
+ * `frontend/vite.config.js`（過去の `tsc -b` が吐いた残骸）が残っていると、
+ * Vite は `.ts` ではなくそちらを読む。すると `envDir` の指定が効かず、
+ * プロジェクトルートの `.env` が一切読まれない。`.env` を書き換えても
+ * 消しても挙動が変わらない、という状態になる。
  */
 
 const env = import.meta.env as Record<string, string | undefined>
 
-/** モックモードか（既定 true）。'false' を明示したときだけ実API。 */
-export const USE_MOCK = (env.VITE_USE_MOCK ?? 'true').toLowerCase() !== 'false'
+/**
+ * 値を真偽に解釈する。
+ * 前後の空白や引用符、大文字小文字、`1/yes/on` 表記を許容する。
+ * `.env` の値に空白が紛れただけでモードが変わる、という事故を避けるため。
+ */
+function asBool(raw: string | undefined): boolean {
+  const v = (raw ?? '').trim().replace(/^["']|["']$/g, '').toLowerCase()
+  return v === 'true' || v === '1' || v === 'yes' || v === 'on'
+}
+
+/** モックモードか。`VITE_USE_MOCK=true` を明示したときだけ true。 */
+export const USE_MOCK = asBool(env.VITE_USE_MOCK)
+
+/**
+ * モード判定に使った生の値。未設定なら null。
+ * 「設定が届いていない」のか「明示的に未設定なのか」を画面側で区別するため。
+ */
+export const USE_MOCK_RAW: string | null = env.VITE_USE_MOCK ?? null
 
 /** APIベースURL（末尾スラッシュなし） */
 export const API_BASE = (env.VITE_API_BASE ?? 'http://localhost:8009/api').replace(/\/$/, '')

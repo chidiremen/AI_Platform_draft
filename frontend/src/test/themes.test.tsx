@@ -324,3 +324,52 @@ describe('computeStalled', () => {
     ).toBe(true)
   })
 })
+
+describe('モックモードの警告帯', () => {
+  it('モックで動いているとログイン前から警告が出る', async () => {
+    // モックではDBのアカウントで入れない。それを黙って行うと
+    // 「アカウントが違う」と誤認されるので、画面から即分かるようにする。
+    localStorage.clear()
+    renderAt('/')
+    expect(await screen.findByText(/モックモードで動作中/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/データベースのアカウントでは/),
+    ).toBeInTheDocument()
+  })
+
+  it('ログイン後も出続ける', async () => {
+    renderAt('/themes')
+    await screen.findByText('議事録の自動要約')
+    expect(screen.getByText(/モックモードで動作中/)).toBeInTheDocument()
+  })
+
+  it('切り替え方法を示している', async () => {
+    renderAt('/themes')
+    await screen.findByText('議事録の自動要約')
+    expect(screen.getByText('VITE_USE_MOCK=false')).toBeInTheDocument()
+  })
+})
+
+describe('タグ・フィルタの選択状態', () => {
+  it('業務シーンのタグを選ぶと選択状態になる', async () => {
+    // 以前は存在しない .chip-on を当てていたため、押しても見た目が
+    // 変わらず「タグが選べない」状態だった
+    renderAt('/themes/new')
+    await screen.findByRole('heading', { name: /テーマを登録/ })
+    const chip = document.querySelector('.theme-form .chip') as HTMLElement
+    expect(chip.className).not.toContain('active')
+    fireEvent.click(chip)
+    await waitFor(() => expect(chip.className).toContain('active'))
+    fireEvent.click(chip)
+    await waitFor(() => expect(chip.className).not.toContain('active'))
+  })
+
+  it('一覧のフィルタも選択状態が付く', async () => {
+    renderAt('/themes')
+    await screen.findByText('議事録の自動要約')
+    const frozen = screen.getByRole('button', { name: /凍結/ })
+    expect(frozen.className).not.toContain('active')
+    fireEvent.click(frozen)
+    await waitFor(() => expect(frozen.className).toContain('active'))
+  })
+})

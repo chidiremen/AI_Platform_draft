@@ -238,6 +238,7 @@ Shift-JIS（メモ帳の「ANSI」）でも動きますが、日本語コメン�
 | `[SKIP] backend already listening ...` | すでに起動済み。二重起動は自動で避けられるので放置してよい |
 | ブラウザは開くが API が 404 / 接続拒否 | `.env` の `VITE_USE_MOCK` が `true` のまま、または `BACKEND_PORT` の不一致 |
 | ログインできない / データが空 | `VITE_USE_MOCK` が `true`。`doctor.bat` で確認 |
+| `.env` を変えてもモックのまま / `.env` を消しても変わらない | **`frontend\vite.config.js` が残っている。** これがあると Vite は `vite.config.ts` を無視し、ルートの `.env` が一切読まれない。削除して再起動する |
 | ユーザーが0件と出る | `db.sqlite3` の置き場所違い。`backend\` 直下に置く |
 | ログインすると 500 になる | `manage.py migrate` 未実行。A の DB が古いスキーマのまま |
 | `ports: ... source=partial` と出る | `.env` が UTF-16 保存。UTF-8 で保存し直す |

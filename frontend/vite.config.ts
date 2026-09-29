@@ -11,6 +11,10 @@ import react from '@vitejs/plugin-react'
  *  - VITE_USE_MOCK  → 実 API モード切替（false でDjangoに接続）
  *  - VITE_API_BASE  → 明示指定した場合は BACKEND_PORT より優先
  */
+// このファイルが読まれていることの確認用。`frontend/vite.config.js` が残って
+// いると Vite はそちらを優先し、この設定（envDir / define）が丸ごと無視される。
+// その状態ではルートの `.env` が一切読まれず、`.env` を編集しても消しても
+// 挙動が変わらない。起動ログに1行出しておけば、読まれているか一目で分かる。
 export default defineConfig(({ mode }) => {
   const rootEnvDir = path.resolve(__dirname, '..')
   // 第3引数 '' で「VITE_プレフィックス以外」も含めて読み込む（FRONTEND_PORT等）
@@ -21,10 +25,19 @@ export default defineConfig(({ mode }) => {
   const frontendPort = Number(env.FRONTEND_PORT ?? '5174')
   const backendPort = env.BACKEND_PORT ?? '8009'
   const apiBase = env.VITE_API_BASE ?? `http://localhost:${backendPort}/api`
-  // 既定は「mock=true」＝ .env が無い/未指定でも動く安全側。
-  // ただしテスト実行時は常に mock を強制する（バックエンド接続に依存させない）。
+  // 既定は「実API」。モックは明示したときだけ。
+  // 未設定でモックに倒すと、設定が届かない事故（後述）のときに画面が何事も
+  // なく立ち上がり、DBのアカウントで入れない理由が分からなくなる。
+  // 実APIを既定にしておけば「繋がらない」と素直に失敗して原因に辿り着ける。
+  // テスト実行時だけは常に mock を強制する（バックエンド接続に依存させない）。
   const isTest = mode === 'test' || process.env.VITEST === 'true'
-  const useMock = isTest ? 'true' : (env.VITE_USE_MOCK ?? 'true')
+  const useMock = isTest ? 'true' : (env.VITE_USE_MOCK ?? 'false')
+
+  if (!process.env.VITEST) {
+    console.log(
+      `[aitc] vite.config.ts を使用 / VITE_USE_MOCK=${useMock} / front:${frontendPort} api:${apiBase}`,
+    )
+  }
 
   return {
     plugins: [react()],
